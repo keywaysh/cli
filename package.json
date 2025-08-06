@@ -1,0 +1,49 @@
+{
+  "name": "@keywaysh/cli",
+  "version": "0.0.1",
+  "description": "One link to all your secrets",
+  "bin": {
+    "keyway": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "secrets",
+    "env",
+    "keyway",
+    "cli",
+    "devops"
+  ],
+  "author": "Nicolas Ritouet",
+  "license": "MIT",
+  "homepage": "https://keyway.sh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/keywaysh/cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/keywaysh/cli/issues"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.2.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.9.2"
+  }
+}
