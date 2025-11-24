@@ -1,170 +1,93 @@
+#!/usr/bin/env node
+
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { initCommand } from './cmds/init.js';
+import { pushCommand } from './cmds/push.js';
+import { pullCommand } from './cmds/pull.js';
+import { loginCommand, logoutCommand } from './cmds/login.js';
+import { doctorCommand } from './cmds/doctor.js';
+import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
 
-const COMING_SOON_MESSAGE = chalk.cyan(`
-🚧 Keyway is coming soon!
+const shouldShowBanner = (): boolean => {
+  if (process.env.KEYWAY_NO_BANNER === '1') return false;
+  const argv = process.argv.slice(2);
+  return !argv.includes('--no-banner') && argv.length > 0;
+};
 
-We're building the simplest way to manage your team's secrets.
-One link in your README = instant access to all secrets.
+const showBanner = () => {
+  const text = chalk.cyan.bold('Keyway CLI');
+  const subtitle = chalk.gray('GitHub-native secrets manager for dev teams');
+  console.log(`\n${text}\n${subtitle}\n`);
+};
 
-${chalk.white('Get early access:')} ${chalk.underline('https://keyway.sh')}
-${chalk.white('Contact:')} ${chalk.underline('unlock@keyway.sh')}
-`);
+if (shouldShowBanner()) {
+  showBanner();
+}
 
 program
   .name('keyway')
-  .description('One link to all your secrets (Coming Soon)')
-  .version('0.0.1');
+  .description('GitHub-native secrets manager for dev teams')
+  .version(packageJson.version)
+  .option('--no-banner', 'Disable the startup banner');
 
-// Command: init (preview)
 program
   .command('init')
-  .description('Initialize Keyway in your project')
+  .description('Initialize a vault for the current repository')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (options) => {
+    await initCommand(options);
+  });
+
+program
+  .command('push')
+  .description('Upload secrets from an env file to the vault')
+  .option('-e, --env <environment>', 'Environment name', 'development')
+  .option('-f, --file <file>', 'Env file to push')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (options) => {
+    await pushCommand(options);
+  });
+
+program
+  .command('pull')
+  .description('Download secrets from the vault to an env file')
+  .option('-e, --env <environment>', 'Environment name', 'development')
+  .option('-f, --file <file>', 'Env file to write to')
+  .option('-y, --yes', 'Overwrite target file without confirmation')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (options) => {
+    await pullCommand(options);
+  });
+
+program
+  .command('login')
+  .description('Authenticate with GitHub via Keyway')
+  .option('--token', 'Authenticate using a GitHub fine-grained PAT')
+  .action(async (options) => {
+    await loginCommand(options);
+  });
+
+program
+  .command('logout')
+  .description('Clear stored Keyway credentials')
   .action(async () => {
-    console.log(chalk.cyan('\n🔑 Keyway Init (Preview)\n'));
-    
-    // Detect repo
-    try {
-      const gitRemote = execSync('git remote get-url origin', { encoding: 'utf-8' }).trim();
-      let repoPath: string | undefined;
-      
-      if (gitRemote.includes('github.com')) {
-        const match = gitRemote.match(/github\.com[:/](.+?)(\.git)?$/);
-        if (match) {
-          repoPath = match[1].replace('.git', '');
-        }
-      }
-      
-      if (repoPath) {
-        console.log(chalk.green('✓') + ' GitHub repository detected:');
-        console.log(`  ${chalk.gray('Repository:')} ${repoPath}`);
-        console.log(`  ${chalk.gray('Future vault URL:')} ${chalk.white(`https://keyway.sh/${repoPath}`)}`);
-        console.log();
-        console.log(chalk.yellow('When launched, you\'ll be able to:'));
-        console.log('  • Store all your secrets securely');
-        console.log('  • Share with your team instantly');
-        console.log('  • Pull secrets with one command');
-        console.log();
-        console.log(chalk.gray('Want early access? Visit https://keyway.sh'));
-      }
-    } catch {
-      console.log(chalk.yellow('No git repository detected'));
-      console.log(chalk.gray('Keyway will work with any GitHub repository'));
-    }
+    await logoutCommand();
   });
 
-// Command: demo
 program
-  .command('demo')
-  .description('See how Keyway will work')
-  .action(() => {
-    console.log(chalk.cyan('\n🎬 Keyway Demo\n'));
-    
-    console.log('How it will work:\n');
-    
-    // Step 1
-    console.log(chalk.white('1. Initialize your project:'));
-    console.log(chalk.gray('   $ ') + chalk.green('keyway init'));
-    console.log(chalk.gray('   ✓ Vault created at https://keyway.sh/your/repo\n'));
-    
-    // Step 2
-    console.log(chalk.white('2. Add the link to your README:'));
-    console.log(chalk.gray('   ## 🔑 Secrets'));
-    console.log(chalk.gray('   Access vault: https://keyway.sh/your/repo\n'));
-    
-    // Step 3
-    console.log(chalk.white('3. Team members pull secrets:'));
-    console.log(chalk.gray('   $ ') + chalk.green('keyway pull'));
-    console.log(chalk.gray('   ✓ Authenticated via GitHub'));
-    console.log(chalk.gray('   ✓ Pulled 23 secrets in 12ms\n'));
-    
-    // Step 4
-    console.log(chalk.white('4. That\'s it! No more:'));
-    console.log(chalk.gray('   ❌ "Can you send me the .env file?"'));
-    console.log(chalk.gray('   ❌ API keys in Slack'));
-    console.log(chalk.gray('   ❌ Outdated credentials'));
-    console.log(chalk.gray('   ❌ Onboarding delays\n'));
-    
-    console.log(chalk.cyan('Ready to simplify your secret management?'));
-    console.log(chalk.white('Get early access: ') + chalk.underline('https://keyway.sh'));
+  .command('doctor')
+  .description('Run environment checks to ensure Keyway runs smoothly')
+  .option('--json', 'Output results as JSON for machine processing', false)
+  .option('--strict', 'Treat warnings as failures', false)
+  .action(async (options) => {
+    await doctorCommand(options);
   });
 
-// Command: waitlist
-program
-  .command('waitlist')
-  .description('Join the early access waitlist')
-  .action(() => {
-    console.log(chalk.cyan('\n🚀 Join the Keyway Waitlist\n'));
-    console.log('Get early access at: ' + chalk.underline('https://keyway.sh'));
-    console.log();
-    console.log('Or email us directly: ' + chalk.underline('unlock@keyway.sh'));
-    console.log();
-    console.log(chalk.gray('We\'ll notify you as soon as Keyway is ready!'));
-  });
-
-// Command: why
-program
-  .command('why')
-  .description('Why we\'re building Keyway')
-  .action(() => {
-    console.log(chalk.cyan('\n💡 Why Keyway?\n'));
-    
-    console.log(chalk.white('The Problem:'));
-    console.log('  • Secrets scattered across Slack, email, and docs');
-    console.log('  • New developer onboarding takes hours');
-    console.log('  • No single source of truth for env variables');
-    console.log('  • Complex solutions like HashiCorp Vault are overkill\n');
-    
-    console.log(chalk.white('Our Solution:'));
-    console.log('  • One link in your README');
-    console.log('  • GitHub access = vault access');
-    console.log('  • Zero-trust architecture');
-    console.log('  • 12ms to pull all secrets\n');
-    
-    console.log(chalk.white('Built for:'));
-    console.log('  • Small to medium dev teams');
-    console.log('  • Projects with multiple environments');
-    console.log('  • Teams tired of complexity\n');
-    
-    console.log(chalk.gray('Learn more at https://keyway.sh'));
-  });
-
-// Command: feedback
-program
-  .command('feedback [message...]')
-  .description('Send us feedback')
-  .action((message) => {
-    if (message && message.length > 0) {
-      console.log(chalk.cyan('\n📬 Thank you for your feedback!\n'));
-      console.log('Your message: ' + chalk.italic(message.join(' ')));
-      console.log();
-      console.log('Please email it to: ' + chalk.underline('unlock@keyway.sh'));
-      console.log(chalk.gray('We read every message!'));
-    } else {
-      console.log(chalk.cyan('\n📬 We\'d love your feedback!\n'));
-      console.log('Email us at: ' + chalk.underline('unlock@keyway.sh'));
-      console.log();
-      console.log('Or use: ' + chalk.gray('keyway feedback "your message here"'));
-    }
-  });
-
-// Hidden command for testing speed
-program
-  .command('speed')
-  .description('Test CLI speed')
-  .action(() => {
-    const start = Date.now();
-    console.log(chalk.green(`⚡ Executed in ${Date.now() - start}ms`));
-  });
-
-// Parse arguments
-program.parse();
-
-// Show coming soon message if no command
-if (!process.argv.slice(2).length) {
-  console.log(COMING_SOON_MESSAGE);
-  console.log(chalk.gray('Try: keyway demo'));
-}
+program.parseAsync().catch((error) => {
+  console.error(chalk.red('Error:'), error.message || error);
+  process.exit(1);
+});

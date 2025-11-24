@@ -1,0 +1,249 @@
+import chalk from 'chalk';
+import fs from 'fs';
+import path from 'path';
+import prompts from 'prompts';
+import { getCurrentRepoFullName } from '../utils/git.js';
+import { APIError, pushSecrets } from '../utils/api.js';
+import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
+import { ensureLogin } from './login.js';
+
+export function deriveEnvFromFile(file: string): string {
+  const base = path.basename(file);
+  const match = base.match(/\.env(?:\.(.+))?$/);
+  if (match) {
+    return match[1] || 'development';
+  }
+  return 'development';
+}
+
+export function discoverEnvCandidates(cwd: string): { file: string; env: string }[] {
+  try {
+    const entries = fs.readdirSync(cwd);
+    const hasEnvLocal = entries.includes('.env.local');
+    if (hasEnvLocal) {
+      console.log(chalk.gray('ℹ️  Detected .env.local — not synced by design (machine-specific secrets)'));
+    }
+
+    const candidates = entries
+      .filter((name) => name.startsWith('.env') && name !== '.env.local')
+      .map((name) => {
+        const fullPath = path.join(cwd, name);
+        try {
+          const stat = fs.statSync(fullPath);
+          if (!stat.isFile()) return null;
+          return { file: name, env: deriveEnvFromFile(name) };
+        } catch {
+          return null;
+        }
+      })
+      .filter((c): c is { file: string; env: string } => Boolean(c));
+
+    // Deduplicate by file name
+    const seen = new Set<string>();
+    const unique: { file: string; env: string }[] = [];
+    for (const c of candidates) {
+      if (seen.has(c.file)) continue;
+      seen.add(c.file);
+      unique.push(c);
+    }
+    return unique;
+  } catch {
+    return [];
+  }
+}
+
+interface PushOptions {
+  env?: string;
+  file?: string;
+  yes?: boolean;
+  loginPrompt?: boolean;
+}
+
+export async function pushCommand(options: PushOptions) {
+  try {
+    console.log(chalk.blue('🔐 Pushing secrets to Keyway...\n'));
+
+    const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
+    let environment = options.env;
+    let envFile = options.file;
+
+    const candidates = discoverEnvCandidates(process.cwd());
+
+    // If env provided but file not, try to match a discovered file
+    if (environment && !envFile) {
+      const match = candidates.find((c) => c.env === environment);
+      if (match) {
+        envFile = match.file;
+      }
+    }
+
+    // If neither provided, prompt to pick from discovered files
+    if (!environment && !envFile && isInteractive && candidates.length > 0) {
+      const { choice } = await prompts(
+        {
+          type: 'select',
+          name: 'choice',
+          message: 'Select an env file to push:',
+          choices: [
+            ...candidates.map((c) => ({
+              title: `${c.file} (env: ${c.env})`,
+              value: c,
+            })),
+            { title: 'Enter a different file...', value: 'custom' },
+          ],
+        },
+        {
+          onCancel: () => {
+            throw new Error('Push cancelled by user.');
+          },
+        }
+      );
+
+      if (choice && choice !== 'custom') {
+        envFile = choice.file;
+        environment = choice.env;
+      } else if (choice === 'custom') {
+        const { fileInput } = await prompts(
+          {
+            type: 'text',
+            name: 'fileInput',
+            message: 'Path to env file:',
+            validate: (value: string) => {
+              if (!value) return 'Path is required';
+              const resolved = path.resolve(process.cwd(), value);
+              if (!fs.existsSync(resolved)) return `File not found: ${value}`;
+              return true;
+            },
+          },
+          {
+            onCancel: () => {
+              throw new Error('Push cancelled by user.');
+            },
+          }
+        );
+
+        envFile = fileInput;
+        environment = deriveEnvFromFile(fileInput);
+      }
+    }
+
+    if (!environment) {
+      environment = 'development';
+    }
+
+    if (!envFile) {
+      envFile = '.env';
+    }
+
+    let envFilePath = path.resolve(process.cwd(), envFile);
+    if (!fs.existsSync(envFilePath)) {
+      if (!isInteractive) {
+        throw new Error(`File not found: ${envFile}. Provide --file <path> or run interactively to choose a file.`);
+      }
+
+      const { newPath } = await prompts(
+        {
+          type: 'text',
+          name: 'newPath',
+          message: `File not found: ${envFile}. Enter an env file path to use:`,
+          validate: (value: string) => {
+            if (!value || typeof value !== 'string') return 'Path is required';
+            const resolved = path.resolve(process.cwd(), value);
+            if (!fs.existsSync(resolved)) return `File not found: ${value}`;
+            return true;
+          },
+        },
+        {
+          onCancel: () => {
+            throw new Error('Push cancelled (no env file provided).');
+          },
+        }
+      );
+
+      if (!newPath || typeof newPath !== 'string') {
+        throw new Error('Push cancelled (no env file provided).');
+      }
+
+      envFile = newPath.trim();
+      envFilePath = path.resolve(process.cwd(), envFile);
+    }
+
+    const content = fs.readFileSync(envFilePath, 'utf-8');
+
+    if (content.trim().length === 0) {
+      throw new Error(`File is empty: ${envFile}`);
+    }
+
+    const lines = content.split('\n').filter((line) => {
+      const trimmed = line.trim();
+      return trimmed.length > 0 && !trimmed.startsWith('#');
+    });
+
+    console.log(`File: ${chalk.cyan(envFile)}`);
+    console.log(`Environment: ${chalk.cyan(environment)}`);
+    console.log(`Variables: ${chalk.cyan(lines.length.toString())}`);
+
+    const repoFullName = getCurrentRepoFullName();
+    console.log(`Repository: ${chalk.cyan(repoFullName)}`);
+
+    if (!options.yes) {
+      const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
+      if (!isInteractive) {
+        throw new Error('Confirmation required. Re-run with --yes in non-interactive environments.');
+      }
+
+      const { confirm } = await prompts(
+        {
+          type: 'confirm',
+          name: 'confirm',
+          message: `Send ${lines.length} secrets from ${envFile} (env: ${environment}) to ${repoFullName}?`,
+          initial: true,
+        },
+        {
+          onCancel: () => {
+            throw new Error('Push cancelled by user.');
+          },
+        }
+      );
+
+      if (!confirm) {
+        console.log(chalk.yellow('Push aborted.'));
+        return;
+      }
+    }
+
+    const accessToken = await ensureLogin({ allowPrompt: options.loginPrompt !== false });
+
+    trackEvent(AnalyticsEvents.CLI_PUSH, {
+      repoFullName,
+      environment,
+      variableCount: lines.length,
+    });
+
+    console.log('\nUploading secrets...');
+    const response = await pushSecrets(repoFullName, environment, content, accessToken);
+
+    console.log(chalk.green('\n✓ ' + response.message));
+    console.log(`\nYour secrets are now encrypted and stored securely.`);
+    console.log(`To retrieve them, run: ${chalk.cyan(`keyway pull --env ${environment}`)}`);
+
+    await shutdownAnalytics();
+  } catch (error) {
+    const message = error instanceof APIError
+      ? `API ${error.statusCode}: ${error.message}`
+      : error instanceof Error
+        ? error.message.slice(0, 200)
+        : 'Unknown error';
+
+    trackEvent(AnalyticsEvents.CLI_ERROR, {
+      command: 'push',
+      error: message,
+    });
+
+    await shutdownAnalytics();
+
+    console.error(chalk.red(`\n✗ Error: ${message}`));
+
+    process.exit(1);
+  }
+}

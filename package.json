@@ -2,17 +2,21 @@
   "name": "@keywaysh/cli",
   "version": "0.0.1",
   "description": "One link to all your secrets",
+  "type": "module",
   "bin": {
     "keyway": "./dist/cli.js"
   },
+  "main": "./dist/cli.js",
   "files": [
     "dist"
   ],
   "scripts": {
-    "dev": "tsx src/cli.ts",
-    "build": "tsup",
-    "build:watch": "tsup --watch",
-    "prepublishOnly": "npm run build"
+    "dev": "pnpm exec tsx src/cli.ts",
+    "build": "pnpm exec tsup",
+    "build:watch": "pnpm exec tsup --watch",
+    "prepublishOnly": "pnpm run build",
+    "test": "pnpm exec vitest run",
+    "test:watch": "pnpm exec vitest"
   },
   "keywords": [
     "secrets",
@@ -31,19 +35,25 @@
   "bugs": {
     "url": "https://github.com/keywaysh/cli/issues"
   },
+  "packageManager": "pnpm@10.6.1",
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^14.0.0",
-    "dotenv": "^17.2.1",
-    "ora": "^8.2.0"
+    "conf": "^15.0.2",
+    "open": "^11.0.0",
+    "posthog-node": "^3.5.0",
+    "prompts": "^2.4.2",
+    "undici": "^7.13.0"
   },
   "devDependencies": {
     "@types/node": "^24.2.0",
+    "@types/prompts": "^2.4.9",
     "tsup": "^8.5.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
   }
 }

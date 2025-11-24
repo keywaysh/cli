@@ -6,3 +6,7 @@ dist/
 .keyway.json
 *.log
 .DS_Store
+CLAUDE.md
+AGENTS.md
+.claude/
+.pnpm-store/
