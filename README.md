@@ -8,31 +8,21 @@
 ## Installation
 
 ```bash
-pnpm add -g @keywaysh/cli
-```
-
-Or use without installing:
-
-```bash
-npx @keywaysh/cli init
+npm install @keywaysh/cli -g
 ```
 
 ## Quick Start
 
 ```bash
-# 0. Authenticate once (browser/device flow)
+# Authenticate and create your vault
 keyway login
-
-# 1. Initialize a vault for your repository
 keyway init
 
-# 2. Prepare your env file with secrets (e.g., .env or .env.staging)
+# Push your secrets (defaults to .env; pick a file with --file)
+keyway push
 
-# 3. Push secrets to the vault
-keyway push --file .env
-
-# 4. On another machine, pull secrets
-keyway pull --file .env
+# On another machine, pull them back
+keyway pull
 ```
 
 ## Commands
