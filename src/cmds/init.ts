@@ -3,6 +3,7 @@ import { getCurrentRepoFullName } from '../utils/git.js';
 import { APIError, initVault } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
+import { addBadgeToReadme } from './readme.js';
 
 interface InitOptions {
   loginPrompt?: boolean;
@@ -27,6 +28,12 @@ export async function initCommand(options: InitOptions = {}) {
     console.log('\nNext steps:');
     console.log(`  1. Create a ${chalk.cyan('.env')} file with your secrets`);
     console.log(`  2. Run ${chalk.cyan('keyway push')} to upload your secrets`);
+
+    try {
+      await addBadgeToReadme();
+    } catch (badgeError) {
+      console.log(chalk.yellow('Badge insertion skipped:'), badgeError instanceof Error ? badgeError.message : String(badgeError));
+    }
 
     await shutdownAnalytics();
   } catch (error) {

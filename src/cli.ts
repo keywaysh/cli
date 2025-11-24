@@ -7,6 +7,7 @@ import { pushCommand } from './cmds/push.js';
 import { pullCommand } from './cmds/pull.js';
 import { loginCommand, logoutCommand } from './cmds/login.js';
 import { doctorCommand } from './cmds/doctor.js';
+import { addBadgeToReadme } from './cmds/readme.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
@@ -85,6 +86,15 @@ program
   .option('--strict', 'Treat warnings as failures', false)
   .action(async (options) => {
     await doctorCommand(options);
+  });
+
+program
+  .command('readme')
+  .description('README utilities')
+  .command('add-badge')
+  .description('Insert the Keyway badge into README')
+  .action(async () => {
+    await addBadgeToReadme();
   });
 
 program.parseAsync().catch((error) => {
