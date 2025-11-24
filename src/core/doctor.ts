@@ -2,7 +2,6 @@ import { execSync } from 'child_process';
 import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { fetch } from 'undici';
 import { INTERNAL_API_URL } from '../config/internal.js';
 
 const API_HEALTH_URL = `${process.env.KEYWAY_API_URL || INTERNAL_API_URL}/`;
@@ -85,11 +84,21 @@ export async function checkGit(): Promise<CheckResult> {
 
 // Network access check
 export async function checkNetwork(): Promise<CheckResult> {
+  const fetchFn = globalThis.fetch;
+  if (!fetchFn) {
+    return {
+      id: 'network',
+      name: 'API connectivity',
+      status: 'warn',
+      detail: 'Fetch API not available in this Node.js runtime'
+    };
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     
-    const response = await fetch(API_HEALTH_URL, {
+    const response = await fetchFn(API_HEALTH_URL, {
       method: 'HEAD',
       signal: controller.signal
     });

@@ -26,9 +26,6 @@ importers:
       prompts:
         specifier: ^2.4.2
         version: 2.4.2
-      undici:
-        specifier: ^7.13.0
-        version: 7.16.0
     devDependencies:
       '@types/node':
         specifier: ^24.2.0
@@ -1040,10 +1037,6 @@ packages:
   undici-types@7.10.0:
     resolution: {integrity: sha512-t5Fy/nfn+14LuOc2KNYg75vZqClpAiqscVvMygNnlsHBFpSXdJaYtXMcdNLpl/Qvc3P2cB3s6lOV51nqsFq4ag==}
 
-  undici@7.16.0:
-    resolution: {integrity: sha512-QEg3HPMll0o3t2ourKwOeUAZ159Kn9mx5pnzHRQO8+Wixmh88YdZRiIwat0iNzNNXn0yoEtXJqFpyW7eM8BV7g==}
-    engines: {node: '>=20.18.1'}
-
   vite-node@3.2.4:
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -2005,8 +1998,6 @@ snapshots:
   uint8array-extras@1.5.0: {}
 
   undici-types@7.10.0: {}
-
-  undici@7.16.0: {}
 
   vite-node@3.2.4(@types/node@24.2.0)(tsx@4.20.3):
     dependencies:
