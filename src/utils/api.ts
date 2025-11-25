@@ -10,10 +10,7 @@ import type {
   ValidateTokenResponse,
 } from '../types.js';
 import { INTERNAL_API_URL } from '../config/internal.js';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const pkg = require('../../package.json');
+import pkg from '../../package.json' with { type: 'json' };
 
 const API_BASE_URL = process.env.KEYWAY_API_URL || INTERNAL_API_URL;
 const USER_AGENT = `keyway-cli/${pkg.version}`;
