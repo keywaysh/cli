@@ -35,7 +35,7 @@ describe('insertBadgeIntoReadme', () => {
   });
 
   it('inserts at top when only h2 title (no h1)', () => {
-    // The regex /^#\s+/ only matches "# " not "## ", so h2-only content gets badge at top
+    // The regex /^#(?!#)\s+/ only matches h1 ("# "), not h2+ ("## "), so h2-only content gets badge at top
     const content = '## Secondary Title\n\nContent here';
     const updated = insertBadgeIntoReadme(content, badge);
     expect(updated).toBe(`${badge}\n\n${content}`);
@@ -80,5 +80,30 @@ describe('insertBadgeIntoReadme', () => {
     const content = '# Title\n\n\n\nSome content';
     const updated = insertBadgeIntoReadme(content, badge);
     expect(updated).toBe(`# Title\n\n${badge}\n\nSome content`);
+  });
+
+  // Regression tests for h1-only matching
+  it('does NOT insert badge after h2/h3 headers', () => {
+    const content = '## Getting Started\n\n### Install\n\nContent';
+    const updated = insertBadgeIntoReadme(content, badge);
+    // No h1 = badge at top
+    expect(updated).toBe(`${badge}\n\n${content}`);
+  });
+
+  it('does NOT insert badge after comments in code blocks', () => {
+    const content = `# Project
+
+\`\`\`bash
+npm run dev
+# this is a comment
+yarn dev
+\`\`\``;
+    const updated = insertBadgeIntoReadme(content, badge);
+    // Badge should be after h1 title, not affected by # in code block
+    expect(updated).toBe(`# Project\n\n${badge}\n\n\`\`\`bash
+npm run dev
+# this is a comment
+yarn dev
+\`\`\``);
   });
 });

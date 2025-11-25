@@ -14,7 +14,7 @@ export function insertBadgeIntoReadme(readmeContent: string, badge: string): str
   }
 
   const lines = readmeContent.split(/\r?\n/);
-  const titleIndex = lines.findIndex((line) => /^#\s+/.test(line.trim()));
+  const titleIndex = lines.findIndex((line) => /^#(?!#)\s+/.test(line.trim()));
 
   if (titleIndex !== -1) {
     const before = lines.slice(0, titleIndex + 1);
