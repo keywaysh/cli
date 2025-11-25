@@ -10,8 +10,13 @@ import type {
   ValidateTokenResponse,
 } from '../types.js';
 import { INTERNAL_API_URL } from '../config/internal.js';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json');
 
 const API_BASE_URL = process.env.KEYWAY_API_URL || INTERNAL_API_URL;
+const USER_AGENT = `keyway-cli/${pkg.version}`;
 
 export class APIError extends Error {
   constructor(
@@ -61,7 +66,10 @@ export async function initVault(
   accessToken: string
 ): Promise<InitVaultResponse> {
   const body: InitVaultRequest = { repoFullName };
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': USER_AGENT,
+  };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -112,7 +120,10 @@ export async function pushSecrets(
 ): Promise<PushSecretsResponse> {
   const secrets = parseEnvContent(content);
   const body = { repoFullName, environment, secrets };
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': USER_AGENT,
+  };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -132,7 +143,10 @@ export async function pullSecrets(
   environment: string,
   accessToken: string
 ): Promise<PullSecretsResponse> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': USER_AGENT,
+  };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
@@ -154,7 +168,10 @@ export async function pullSecrets(
 export async function startDeviceLogin(repository?: string | null): Promise<DeviceStartResponse> {
   const response = await fetch(`${API_BASE_URL}/v1/auth/device/start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': USER_AGENT,
+    },
     body: JSON.stringify(repository ? { repository } : {}),
   });
 
@@ -164,7 +181,10 @@ export async function startDeviceLogin(repository?: string | null): Promise<Devi
 export async function pollDeviceLogin(deviceCode: string): Promise<DevicePollResponse> {
   const response = await fetch(`${API_BASE_URL}/v1/auth/device/poll`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': USER_AGENT,
+    },
     body: JSON.stringify({ deviceCode }),
   });
 
@@ -176,6 +196,7 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'User-Agent': USER_AGENT,
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({}),
