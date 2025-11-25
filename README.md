@@ -1,49 +1,81 @@
-# Keyway CLI
-
-> GitHub-native secrets manager for dev teams
+<div align="center">
+  <h1>Keyway CLI</h1>
+  <strong>The simplest way to sync your project's environment variables.</strong><br/>
+  Stop sending <code>.env</code> files on Slack. One command and you're in sync.
+  <br/><br/>
+  <a href="https://keyway.sh">keyway.sh</a> ·
+  <a href="https://github.com/keywaysh/cli">GitHub</a> ·
+  <a href="https://www.npmjs.com/package/@keywaysh/cli">NPM</a>
+  <br/><br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://badge.fury.io/js/%40keywaysh%2Fcli.svg)](https://www.npmjs.com/package/@keywaysh/cli)
 
-## Installation
+</div>
+
+## Why Keyway?
+
+Most devs store secrets in... chaotic places:
+
+- Slack
+- Notion
+- Discord
+- Google Docs
+- Lost `.env` files
+- Messages you can't find anymore
+- Machine of the dev who left the project
+
+**Keyway fixes that.**
+
+If you have GitHub access to a repo → you have access to its secrets.
+No invites. No dashboards. No complex config.
+Just one command that works.
+
+## Install
 
 ```bash
-npm install @keywaysh/cli -g
+npm install -g @keywaysh/cli
 ```
 
 ## Quick Start
 
+Inside any project connected to GitHub:
+
 ```bash
-# Authenticate and create your vault
 keyway login
 keyway init
+```
 
-# Push your secrets (defaults to .env; pick a file with --file)
-keyway push
+What happens:
 
-# On another machine, pull them back
+1. Keyway authenticates via GitHub OAuth
+2. Detects your GitHub repo
+3. Creates a vault for this repo
+4. Asks if you want to sync your `.env`
+
+Then any teammate can simply run:
+
+```bash
 keyway pull
 ```
+
+And boom: your `.env` is recreated locally.
 
 ## Commands
 
 ### `keyway login`
 
-Authenticate with GitHub through the Keyway OAuth/device flow and cache a session locally.
+Authenticate with GitHub through the Keyway OAuth/device flow.
 
 ```bash
 keyway login
 ```
 
-If you forget to log in, `init`, `push`, and `pull` will prompt you to authenticate (skip with `--no-login-prompt` in CI).
-
-Fine-grained PAT alternative:
+If you prefer using a fine-grained PAT:
 
 ```bash
 keyway login --token
 ```
-
-This opens GitHub to create a repo-scoped fine-grained PAT (metadata: read-only, no account permissions). Paste the `github_pat_...` token when prompted; the CLI validates and stores it.
 
 ### `keyway init`
 
@@ -53,18 +85,15 @@ Initialize a vault for the current repository.
 keyway init
 ```
 
-**Requirements:**
-- Must be in a git repository
-- Repository must have a GitHub remote
-- Authenticated via `keyway login` (or provide `GITHUB_TOKEN`)
+Creates a vault, pushes your `.env`, and sets everything up.
 
 ### `keyway push`
 
-Upload secrets from a local env file to the vault.
+Push your local `.env` to the vault.
 
 ```bash
-# Push env file to development environment (default)
-keyway push --file .env
+# Push to development (default)
+keyway push
 
 # Push to a specific environment
 keyway push --env production
@@ -73,35 +102,36 @@ keyway push --env production
 keyway push --file .env.staging --env staging
 ```
 
-**Options:**
-- `-e, --env <environment>` - Environment name (default: "development")
-- `-f, --file <file>` - File to push (default file used if not provided)
+Useful when:
+- you added a new variable
+- you rotated a key
+- you fixed a staging/production mismatch
 
 ### `keyway pull`
 
-Download secrets from the vault to a local env file.
+Pull secrets from the vault and write them to `.env`.
 
 ```bash
-# Pull development environment to your env file (default path if omitted)
-keyway pull --file .env
+# Pull development environment (default)
+keyway pull
 
 # Pull from a specific environment
 keyway pull --env production
 
 # Pull to a different file
-keyway pull --file .env.local --env development
+keyway pull --file .env.local
 ```
 
-**Options:**
-- `-e, --env <environment>` - Environment name (default: "development")
-- `-f, --file <file>` - File to write to (default file used if not provided)
+Perfect for:
+- onboarding a new dev
+- syncing your local environment
+- switching between machines
 
 ### `keyway doctor`
 
-Run comprehensive environment diagnostics.
+Diagnostic command to check your setup.
 
 ```bash
-# Run all checks
 keyway doctor
 
 # Output as JSON (for CI/CD)
@@ -112,132 +142,106 @@ keyway doctor --strict
 ```
 
 **Checks performed:**
-- ✅ Node.js version (≥18.0.0 required)
-- ✅ Git installation and repository status
-- ✅ Network connectivity to API
-- ✅ File system write permissions
-- ✅ .gitignore configuration for environment files
+- Node.js version (≥18.0.0 required)
+- Git installation and repository status
+- API connectivity
+- File system write permissions
+- `.gitignore` configuration
+- System clock synchronization
+
+### `keyway logout`
+
+Clear stored Keyway credentials.
+
+```bash
+keyway logout
+```
+
+## Security
+
+Keyway is designed to be **simple and secure** — a major upgrade from Slack or Notion, without the complexity of Hashicorp Vault or AWS Secrets Manager.
+
+**What we do:**
+- AES-256-GCM encryption server-side
+- TLS everywhere
+- GitHub read-only permissions
+- No access to your code
+- Secrets stored encrypted at rest
+- No analytics on secret values (only metadata)
+
+**What we don't do:**
+- No zero-trust enterprise model
+- No access to your cloud infrastructure
+- No access to your production deployment keys
+
+More details: [keyway.sh/security](https://keyway.sh/security)
+
+## Who is this for?
+
+Keyway is perfect for:
+- Solo developers
+- Small teams
+- Side-projects
+- Early SaaS
+- Agencies managing many repos
+- Rapid prototyping
+
+**Not designed for:**
+- Banks
+- Governments
+- Enterprise zero-trust teams
+  *(you're looking for Vault, Doppler, or AWS Secrets Manager)*
+
+## Example Workflow
+
+```bash
+git clone git@github.com:acme/backend.git
+cd backend
+keyway pull
+# ✓ secrets pulled
+npm run dev
+```
+
+Add a new secret:
+
+```bash
+echo "STRIPE_KEY=sk_live_xxx" >> .env
+keyway push
+# ✓ 1 secret updated
+```
 
 ## Configuration
 
-### GitHub Token
-
-Keyway prefers the OAuth/device flow:
-
-```bash
-keyway login
-```
-
-This opens a browser (or gives you a code/URL) and stores a Keyway token in `~/.config/keyway/config.json`.
+### GitHub Token (alternative to login)
 
 If you cannot use the login flow, set a GitHub token manually:
 
-**Option 1: Environment Variable**
-
 ```bash
+# Environment variable
 export GITHUB_TOKEN=your_github_personal_access_token
-```
 
-**Option 2: Git Config**
-
-```bash
+# Or via git config
 git config --global github.token your_github_personal_access_token
 ```
 
-**Creating a GitHub Token:**
-
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Click "Generate new token"
-3. Select scopes: `repo` (Full control of private repositories)
-4. Generate and copy the token
-
 ### API URL
 
-By default, Keyway uses the production API at `https://keyway-backend-production.up.railway.app`. To point to another API:
+By default, Keyway uses the production API. To point to another API:
 
 ```bash
 export KEYWAY_API_URL=http://localhost:3000
 ```
 
-### Analytics
-
-Keyway uses PostHog for privacy-first analytics. To configure:
-
-```bash
-export KEYWAY_POSTHOG_KEY=your_posthog_key
-export KEYWAY_POSTHOG_HOST=https://app.posthog.com
-```
-
-Disable telemetry:
+### Disable Telemetry
 
 ```bash
 export KEYWAY_DISABLE_TELEMETRY=1
 ```
 
-The CLI ships with built-in analytics defaults; use the env vars above to override for development.
-
-**Privacy:** No secret names or values are ever sent to analytics.
-
-## How It Works
-
-1. **Authentication**: Uses your GitHub token to verify identity
-2. **Authorization**: Checks if you're a collaborator/admin on the repository
-3. **Encryption**: All secrets are encrypted server-side with AES-256-GCM
-4. **Storage**: Encrypted secrets stored in PostgreSQL
-5. **Retrieval**: Secrets are decrypted and returned only to authorized users
-
-## Development
-
-```bash
-# Install dependencies
-npm install
-
-# Run in dev mode
-npm run dev
-
-# Build
-npm run build
-
-# Watch mode
-npm run build:watch
-
-# Run tests
-npm test
-
-# Test locally
-npm link
-keyway --version
-```
-
-## Architecture
-
-```
-src/
-├── cli.tsx          # Main CLI entry point with commander
-├── types.ts         # TypeScript types and interfaces
-├── ui/              # Ink React components
-│   ├── Banner.tsx   # Startup banner with gradient
-│   └── Spinner.tsx  # Loading spinner component
-├── cmds/            # Command implementations
-│   ├── init.ts      # Initialize vault
-│   ├── push.ts      # Push secrets
-│   ├── pull.ts      # Pull secrets
-│   └── doctor.tsx   # Environment diagnostics
-├── utils/           # Utility functions
-│   ├── analytics.ts # PostHog integration
-│   ├── api.ts       # API client
-│   └── git.ts       # Git helpers
-└── core/            # Core business logic
-    └── doctor.ts    # Doctor checks implementations
-```
-
-## Privacy & Security
-
-### Analytics Safety
+## Privacy & Analytics
 
 **NEVER tracked:**
-- Secret names (e.g., `API_KEY`, `DATABASE_URL`)
-- Secret values
+- Secret names or values
 - Environment variable content
 - Access tokens
 - File contents
@@ -245,21 +249,13 @@ src/
 **Only tracked:**
 - Command usage (init, push, pull)
 - Repository names (public info)
-- Environment names (e.g., "production")
-- Number of variables (count only)
 - Error messages (sanitized)
-- Machine-specific anonymous ID
-
-### Distinct ID
-
-Each machine has a unique, anonymous identifier stored in `~/.config/keyway/id.json`. This ID is randomly generated and contains no personally identifiable information.
 
 ## Troubleshooting
 
 ### "Not in a git repository"
 
 ```bash
-# Initialize git and add a remote
 git init
 git remote add origin git@github.com:your-org/your-repo.git
 ```
@@ -267,14 +263,14 @@ git remote add origin git@github.com:your-org/your-repo.git
 ### "GitHub token not found"
 
 ```bash
-# Set your GitHub token
+keyway login
+# or
 export GITHUB_TOKEN=your_token
 ```
 
 ### "Vault not found"
 
 ```bash
-# Initialize the vault first
 keyway init
 ```
 
@@ -282,36 +278,24 @@ keyway init
 
 Make sure you're a collaborator or admin on the GitHub repository.
 
-### Disabling the Banner
+## TL;DR
 
 ```bash
-# Via command line flag
-keyway --no-banner doctor
-
-# Via environment variable
-export KEYWAY_NO_BANNER=1
-keyway doctor
+npm i -g @keywaysh/cli
+keyway login
+keyway init
+keyway pull
 ```
 
-## Publishing to npm
+No more Slack. No more outdated `.env`.
+Your team stays perfectly in sync.
 
-```bash
-# Update version
-npm version patch  # or minor, or major
+## Support
 
-# Build
-npm run build
-
-# Publish
-npm publish
-```
+- **Issues**: [github.com/keywaysh/cli/issues](https://github.com/keywaysh/cli/issues)
+- **Email**: unlock@keyway.sh
+- **Website**: [keyway.sh](https://keyway.sh)
 
 ## License
 
 MIT © Nicolas Ritouet
-
-## Support
-
-- **Issues**: https://github.com/keywaysh/cli/issues
-- **Email**: unlock@keyway.sh
-- **Website**: https://keyway.sh

@@ -66,13 +66,42 @@ export async function initVault(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/vaults/init`, {
+  const response = await fetch(`${API_BASE_URL}/v1/vaults`, {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
 
-  return handleResponse<InitVaultResponse>(response);
+  const result = await handleResponse<{ data: InitVaultResponse }>(response);
+  return result.data;
+}
+
+/**
+ * Parse .env content into key-value pairs
+ */
+function parseEnvContent(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  const lines = content.split('\n');
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+
+    const key = trimmed.substring(0, eqIndex).trim();
+    let value = trimmed.substring(eqIndex + 1);
+
+    if ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+
+    if (key) result[key] = value;
+  }
+
+  return result;
 }
 
 export async function pushSecrets(
@@ -81,23 +110,21 @@ export async function pushSecrets(
   content: string,
   accessToken: string
 ): Promise<PushSecretsResponse> {
-  const body: PushSecretsRequest = { content };
+  const secrets = parseEnvContent(content);
+  const body = { repoFullName, environment, secrets };
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
-  const encodedRepo = encodeURIComponent(repoFullName);
 
-  const response = await fetch(
-    `${API_BASE_URL}/vaults/${encodedRepo}/${environment}/push`,
-    {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/v1/secrets/push`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
 
-  return handleResponse<PushSecretsResponse>(response);
+  const result = await handleResponse<{ data: PushSecretsResponse }>(response);
+  return result.data;
 }
 
 export async function pullSecrets(
@@ -105,25 +132,27 @@ export async function pullSecrets(
   environment: string,
   accessToken: string
 ): Promise<PullSecretsResponse> {
-  const encodedRepo = encodeURIComponent(repoFullName);
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const response = await fetch(
-    `${API_BASE_URL}/vaults/${encodedRepo}/${environment}/pull`,
-    {
-      method: 'GET',
-      headers,
-    }
-  );
+  const params = new URLSearchParams({
+    repo: repoFullName,
+    environment,
+  });
 
-  return handleResponse<PullSecretsResponse>(response);
+  const response = await fetch(`${API_BASE_URL}/v1/secrets/pull?${params}`, {
+    method: 'GET',
+    headers,
+  });
+
+  const result = await handleResponse<{ data: { content: string } }>(response);
+  return { content: result.data.content };
 }
 
 export async function startDeviceLogin(repository?: string | null): Promise<DeviceStartResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/device/start`, {
+  const response = await fetch(`${API_BASE_URL}/v1/auth/device/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(repository ? { repository } : {}),
@@ -133,7 +162,7 @@ export async function startDeviceLogin(repository?: string | null): Promise<Devi
 }
 
 export async function pollDeviceLogin(deviceCode: string): Promise<DevicePollResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/device/poll`, {
+  const response = await fetch(`${API_BASE_URL}/v1/auth/device/poll`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ deviceCode }),
@@ -143,7 +172,7 @@ export async function pollDeviceLogin(deviceCode: string): Promise<DevicePollRes
 }
 
 export async function validateToken(token: string): Promise<ValidateTokenResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/token/validate`, {
+  const response = await fetch(`${API_BASE_URL}/v1/auth/token/validate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

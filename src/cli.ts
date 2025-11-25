@@ -7,16 +7,9 @@ import { pushCommand } from './cmds/push.js';
 import { pullCommand } from './cmds/pull.js';
 import { loginCommand, logoutCommand } from './cmds/login.js';
 import { doctorCommand } from './cmds/doctor.js';
-import { addBadgeToReadme } from './cmds/readme.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
-
-const shouldShowBanner = (): boolean => {
-  if (process.env.KEYWAY_NO_BANNER === '1') return false;
-  const argv = process.argv.slice(2);
-  return !argv.includes('--no-banner') && argv.length > 0;
-};
 
 const showBanner = () => {
   const text = chalk.cyan.bold('Keyway CLI');
@@ -24,15 +17,12 @@ const showBanner = () => {
   console.log(`\n${text}\n${subtitle}\n`);
 };
 
-if (shouldShowBanner()) {
-  showBanner();
-}
+showBanner();
 
 program
   .name('keyway')
   .description('GitHub-native secrets manager for dev teams')
-  .version(packageJson.version)
-  .option('--no-banner', 'Disable the startup banner');
+  .version(packageJson.version);
 
 program
   .command('init')
@@ -86,15 +76,6 @@ program
   .option('--strict', 'Treat warnings as failures', false)
   .action(async (options) => {
     await doctorCommand(options);
-  });
-
-program
-  .command('readme')
-  .description('README utilities')
-  .command('add-badge')
-  .description('Insert the Keyway badge into README')
-  .action(async () => {
-    await addBadgeToReadme();
   });
 
 program.parseAsync().catch((error) => {

@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { INTERNAL_API_URL } from '../config/internal.js';
 
-const API_HEALTH_URL = `${process.env.KEYWAY_API_URL || INTERNAL_API_URL}/`;
+const API_HEALTH_URL = `${process.env.KEYWAY_API_URL || INTERNAL_API_URL}/v1/health`;
 
 export type CheckStatus = 'pass' | 'fail' | 'warn';
 
@@ -228,7 +228,7 @@ export async function checkSystemClock(): Promise<CheckResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     
-    const response = await fetch('https://api.keyway.sh/', {
+    const response = await fetch('https://api.keyway.sh/v1/health', {
       method: 'HEAD',
       signal: controller.signal
     });

@@ -224,6 +224,18 @@ export async function pushCommand(options: PushOptions) {
     const response = await pushSecrets(repoFullName, environment, content, accessToken);
 
     console.log(chalk.green('\n✓ ' + response.message));
+
+    if (response.stats) {
+      const { created, updated, deleted } = response.stats;
+      const parts: string[] = [];
+      if (created > 0) parts.push(chalk.green(`+${created} created`));
+      if (updated > 0) parts.push(chalk.yellow(`~${updated} updated`));
+      if (deleted > 0) parts.push(chalk.red(`-${deleted} deleted`));
+      if (parts.length > 0) {
+        console.log(`Stats: ${parts.join(', ')}`);
+      }
+    }
+
     console.log(`\nYour secrets are now encrypted and stored securely.`);
     console.log(`To retrieve them, run: ${chalk.cyan(`keyway pull --env ${environment}`)}`);
 

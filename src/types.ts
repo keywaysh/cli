@@ -21,6 +21,11 @@ export interface PushSecretsRequest {
 export interface PushSecretsResponse {
   success: boolean;
   message: string;
+  stats?: {
+    created: number;
+    updated: number;
+    deleted: number;
+  };
 }
 
 export interface PullSecretsResponse {

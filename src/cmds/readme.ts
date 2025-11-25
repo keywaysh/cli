@@ -19,6 +19,10 @@ export function insertBadgeIntoReadme(readmeContent: string, badge: string): str
   if (titleIndex !== -1) {
     const before = lines.slice(0, titleIndex + 1);
     const after = lines.slice(titleIndex + 1);
+    // Remove leading empty lines from after (we'll add our own spacing)
+    while (after.length > 0 && after[0].trim() === '') {
+      after.shift();
+    }
     const newLines = [...before, '', badge, '', ...after];
     return newLines.join('\n');
   }
