@@ -5,7 +5,7 @@ import chalk from 'chalk';
 import { detectGitRepo } from '../utils/git.js';
 
 export function generateBadge(repo: string): string {
-  return `[![Keyway Secrets](https://keyway.sh/badge.svg?repo=${repo})](https://keyway.sh/repo/${repo})`;
+  return `[![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=${repo})](https://www.keyway.sh/dashboard/vaults/${repo})`;
 }
 
 export function insertBadgeIntoReadme(readmeContent: string, badge: string): string {
