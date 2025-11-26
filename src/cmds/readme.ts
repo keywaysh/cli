@@ -74,7 +74,7 @@ async function ensureReadme(repoName: string, cwd: string): Promise<string | nul
   return defaultPath;
 }
 
-export async function addBadgeToReadme(): Promise<void> {
+export async function addBadgeToReadme(silent = false): Promise<boolean> {
   const repo = detectGitRepo();
   if (!repo) {
     throw new Error('This directory is not a Git repository.');
@@ -82,17 +82,22 @@ export async function addBadgeToReadme(): Promise<void> {
 
   const cwd = process.cwd();
   const readmePath = await ensureReadme(repo, cwd);
-  if (!readmePath) return;
+  if (!readmePath) return false;
 
   const badge = generateBadge(repo);
   const content = fs.readFileSync(readmePath, 'utf-8');
   const updated = insertBadgeIntoReadme(content, badge);
 
   if (updated === content) {
-    console.log(chalk.gray('Keyway badge already present in README.'));
-    return;
+    if (!silent) {
+      console.log(chalk.gray('Keyway badge already present in README.'));
+    }
+    return false;
   }
 
   fs.writeFileSync(readmePath, updated, 'utf-8');
-  console.log(chalk.green(`✓ Keyway badge added to ${path.basename(readmePath)}`));
+  if (!silent) {
+    console.log(chalk.green(`✓ Keyway badge added to ${path.basename(readmePath)}`));
+  }
+  return true;
 }

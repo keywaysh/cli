@@ -29,10 +29,12 @@ export async function initCommand(options: InitOptions = {}) {
 
     console.log(chalk.green('✓ Vault created!'));
 
-    // Add badge to README
+    // Add badge to README (silent mode - we handle the message ourselves)
     try {
-      await addBadgeToReadme();
-      console.log(chalk.green('✓ Badge added to README.md'));
+      const badgeAdded = await addBadgeToReadme(true);
+      if (badgeAdded) {
+        console.log(chalk.green('✓ Badge added to README.md'));
+      }
     } catch {
       // Silent fail for badge
     }
@@ -75,8 +77,20 @@ export async function initCommand(options: InitOptions = {}) {
 
     await shutdownAnalytics();
   } catch (error) {
+    // Handle specific error cases with friendly messages
+    if (error instanceof APIError) {
+      if (error.statusCode === 409) {
+        console.log(chalk.yellow('\n⚠ Vault already exists for this repository.\n'));
+        console.log(`  ${chalk.yellow('→')} Run ${chalk.cyan('keyway push')} to sync your secrets`);
+        console.log(`  ${chalk.blue('⎔')} Dashboard: ${chalk.underline(`${DASHBOARD_URL}/${getCurrentRepoFullName()}`)}`);
+        console.log('');
+        await shutdownAnalytics();
+        return;
+      }
+    }
+
     const message = error instanceof APIError
-      ? `API ${error.statusCode}: ${error.message}`
+      ? error.message
       : error instanceof Error
         ? error.message.slice(0, 200)
         : 'Unknown error';
@@ -88,7 +102,7 @@ export async function initCommand(options: InitOptions = {}) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ Error: ${message}`));
+    console.error(chalk.red(`\n✗ ${message}`));
 
     process.exit(1);
   }
