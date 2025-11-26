@@ -53,8 +53,16 @@ export async function runLoginFlow(): Promise<string> {
   });
 
   const pollIntervalMs = (start.interval ?? 5) * 1000;
+  // Use server-provided expiration, capped at 30 minutes max
+  const maxTimeoutMs = Math.min((start.expiresIn ?? 900) * 1000, 30 * 60 * 1000);
+  const startTime = Date.now();
 
   while (true) {
+    // Check for timeout
+    if (Date.now() - startTime > maxTimeoutMs) {
+      throw new Error('Login timed out. Please run "keyway login" again.');
+    }
+
     await sleep(pollIntervalMs);
     const result = await pollDeviceLogin(start.deviceCode);
 
