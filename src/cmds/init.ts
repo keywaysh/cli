@@ -87,6 +87,23 @@ export async function initCommand(options: InitOptions = {}) {
         await shutdownAnalytics();
         return;
       }
+
+      if (error.error === 'PLAN_LIMIT_REACHED') {
+        console.log('');
+        console.log(chalk.dim('─'.repeat(50)));
+        console.log('');
+        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade to Pro')}`);
+        console.log('');
+        console.log(chalk.gray('  You\'ve reached the limit of your free plan.'));
+        console.log(chalk.gray('  Upgrade to Pro for unlimited private repositories.'));
+        console.log('');
+        console.log(`  ${chalk.cyan('→')} ${chalk.underline(error.upgradeUrl || 'https://keyway.sh/upgrade')}`);
+        console.log('');
+        console.log(chalk.dim('─'.repeat(50)));
+        console.log('');
+        await shutdownAnalytics();
+        process.exit(1);
+      }
     }
 
     const message = error instanceof APIError

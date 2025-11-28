@@ -19,7 +19,8 @@ export class APIError extends Error {
   constructor(
     public statusCode: number,
     public error: string,
-    message: string
+    message: string,
+    public upgradeUrl?: string
   ) {
     super(message);
     this.name = 'APIError';
@@ -34,8 +35,9 @@ async function handleResponse<T>(response: Response): Promise<T> {
     if (contentType.includes('application/json')) {
       try {
         const error = JSON.parse(text) as ErrorResponse;
-        throw new APIError(response.status, error.error, error.message);
-      } catch {
+        throw new APIError(response.status, error.error, error.message, error.upgrade_url);
+      } catch (e) {
+        if (e instanceof APIError) throw e;
         throw new APIError(response.status, 'http_error', text || `HTTP ${response.status}`);
       }
     }
