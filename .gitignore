@@ -9,4 +9,4 @@ dist/
 CLAUDE.md
 AGENTS.md
 .claude/
-.pnpm-store/
+.pnpm-store/.claude
