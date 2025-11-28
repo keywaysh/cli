@@ -293,7 +293,7 @@ Your team stays perfectly in sync.
 ## Support
 
 - **Issues**: [github.com/keywaysh/cli/issues](https://github.com/keywaysh/cli/issues)
-- **Email**: unlock@keyway.sh
+- **Email**: hello@keyway.sh
 - **Website**: [keyway.sh](https://keyway.sh)
 
 ## License
