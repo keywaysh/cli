@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
-import pkg from '../../package.json' assert { type: 'json' };
+import pkg from '../../package.json' with { type: 'json' };
 import { INTERNAL_POSTHOG_HOST, INTERNAL_POSTHOG_KEY } from '../config/internal.js';
 
 let posthog: PostHog | null = null;

@@ -162,19 +162,20 @@ keyway logout
 Keyway is designed to be **simple and secure** — a major upgrade from Slack or Notion, without the complexity of Hashicorp Vault or AWS Secrets Manager.
 
 **What we do:**
-- AES-256-GCM encryption server-side
-- TLS everywhere
+- AES-256-GCM encryption server-side and client-side token storage
+- TLS everywhere (HTTPS enforced)
 - GitHub read-only permissions
 - No access to your code
 - Secrets stored encrypted at rest
 - No analytics on secret values (only metadata)
+- Encrypted token storage with file permissions
 
 **What we don't do:**
 - No zero-trust enterprise model
 - No access to your cloud infrastructure
 - No access to your production deployment keys
 
-More details: [keyway.sh/security](https://keyway.sh/security)
+For detailed security information, see [SECURITY.md](./SECURITY.md) and [keyway.sh/security](https://keyway.sh/security)
 
 ## Who is this for?
 

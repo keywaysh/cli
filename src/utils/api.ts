@@ -15,6 +15,39 @@ import pkg from '../../package.json' with { type: 'json' };
 const API_BASE_URL = process.env.KEYWAY_API_URL || INTERNAL_API_URL;
 const USER_AGENT = `keyway-cli/${pkg.version}`;
 
+// Security: Enforce HTTPS for production API
+function validateApiUrl(url: string): void {
+  const parsed = new URL(url);
+
+  // Only allow HTTPS in production
+  if (parsed.protocol !== 'https:') {
+    // Allow HTTP only for localhost/development
+    const isLocalhost = parsed.hostname === 'localhost' ||
+                       parsed.hostname === '127.0.0.1' ||
+                       parsed.hostname === '0.0.0.0';
+
+    if (!isLocalhost) {
+      throw new Error(
+        `Insecure API URL detected: ${url}\n` +
+        `HTTPS is required for security. If this is a development server, ` +
+        `use localhost or configure HTTPS.`
+      );
+    }
+
+    // Warn about HTTP usage even for localhost
+    if (!process.env.KEYWAY_DISABLE_SECURITY_WARNINGS) {
+      console.warn(
+        `⚠️  WARNING: Using insecure HTTP connection to ${url}\n` +
+        `This should only be used for local development.\n` +
+        `Set KEYWAY_DISABLE_SECURITY_WARNINGS=1 to suppress this warning.`
+      );
+    }
+  }
+}
+
+// Validate API URL on module load
+validateApiUrl(API_BASE_URL);
+
 export class APIError extends Error {
   constructor(
     public statusCode: number,

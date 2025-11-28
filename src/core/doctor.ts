@@ -228,7 +228,7 @@ export async function checkSystemClock(): Promise<CheckResult> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2000);
     
-    const response = await fetch('https://api.keyway.sh/v1/health', {
+    const response = await fetch(API_HEALTH_URL, {
       method: 'HEAD',
       signal: controller.signal
     });

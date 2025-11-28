@@ -71,7 +71,7 @@ export async function runLoginFlow(): Promise<string> {
     }
 
     if (result.status === 'approved' && result.keywayToken) {
-      saveAuthToken(result.keywayToken, {
+      await saveAuthToken(result.keywayToken, {
         githubLogin: result.githubLogin,
         expiresAt: result.expiresAt,
       });
@@ -98,7 +98,7 @@ export async function ensureLogin(options: { allowPrompt?: boolean } = {}): Prom
     return envToken;
   }
 
-  const stored = getStoredAuth();
+  const stored = await getStoredAuth();
   if (stored?.keywayToken) {
     return stored.keywayToken;
   }
@@ -164,7 +164,7 @@ async function runTokenLogin(): Promise<string> {
 
   const validation = await validateToken(trimmedToken);
 
-  saveAuthToken(trimmedToken, {
+  await saveAuthToken(trimmedToken, {
     githubLogin: validation.username,
   });
 
