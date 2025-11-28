@@ -7,7 +7,7 @@ describe('generateBadge', () => {
   it('generates correct badge URL format', () => {
     const result = generateBadge('NicolasRitouet/guideeco.fr');
     expect(result).toContain('https://www.keyway.sh/badge.svg?repo=NicolasRitouet/guideeco.fr');
-    expect(result).toContain('https://www.keyway.sh/dashboard/vaults/NicolasRitouet/guideeco.fr');
+    expect(result).toContain('https://www.keyway.sh/vaults/NicolasRitouet/guideeco.fr');
   });
 
   it('generates markdown image link', () => {
