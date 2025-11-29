@@ -127,4 +127,7 @@ export const AnalyticsEvents = {
   CLI_ERROR: 'cli_error',
   CLI_LOGIN: 'cli_login',
   CLI_DOCTOR: 'cli_doctor',
+  CLI_CONNECT: 'cli_connect',
+  CLI_DISCONNECT: 'cli_disconnect',
+  CLI_SYNC: 'cli_sync',
 } as const;
