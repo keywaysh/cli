@@ -241,11 +241,28 @@ export async function pushCommand(options: PushOptions) {
 
     await shutdownAnalytics();
   } catch (error) {
-    const message = error instanceof APIError
-      ? `API ${error.statusCode}: ${error.message}`
-      : error instanceof Error
-        ? error.message.slice(0, 200)
-        : 'Unknown error';
+    let message: string;
+    let hint: string | null = null;
+
+    if (error instanceof APIError) {
+      // Use the full message, fallback to error code if empty
+      message = error.message || `HTTP ${error.statusCode} - ${error.error}`;
+
+      // Detect environment not found error and provide helpful hint
+      const envNotFoundMatch = message.match(/Environment '([^']+)' does not exist.*Available environments: ([^.]+)/);
+      if (envNotFoundMatch) {
+        const requestedEnv = envNotFoundMatch[1];
+        const availableEnvs = envNotFoundMatch[2];
+        message = `Environment '${requestedEnv}' does not exist in this vault.`;
+        hint = `Available environments: ${availableEnvs}\n` +
+               `Use ${chalk.cyan(`keyway push --env <environment>`)} to specify one, ` +
+               `or create '${requestedEnv}' via the dashboard.`;
+      }
+    } else if (error instanceof Error) {
+      message = error.message.slice(0, 200);
+    } else {
+      message = 'Unknown error';
+    }
 
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'push',
@@ -255,6 +272,9 @@ export async function pushCommand(options: PushOptions) {
     await shutdownAnalytics();
 
     console.error(chalk.red(`\n✗ Error: ${message}`));
+    if (hint) {
+      console.error(chalk.gray(`\n${hint}`));
+    }
 
     process.exit(1);
   }
