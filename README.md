@@ -5,7 +5,8 @@
   <br/><br/>
   <a href="https://keyway.sh">keyway.sh</a> ·
   <a href="https://github.com/keywaysh/cli">GitHub</a> ·
-  <a href="https://www.npmjs.com/package/@keywaysh/cli">NPM</a>
+  <a href="https://www.npmjs.com/package/@keywaysh/cli">NPM</a> ·
+  <a href="https://status.keyway.sh">Status</a>
   <br/><br/>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
