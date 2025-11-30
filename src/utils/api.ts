@@ -148,8 +148,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (contentType.includes('application/json')) {
       try {
-        const error = JSON.parse(text) as ErrorResponse;
-        throw new APIError(response.status, error.error, error.message, error.upgrade_url);
+        const error = JSON.parse(text);
+        // Support both legacy format {error, message} and RFC 7807 {type, title, detail}
+        const errorCode = error.error || error.title || 'http_error';
+        const errorMessage = error.message || error.detail || `HTTP ${response.status}`;
+        const upgradeUrl = error.upgrade_url || error.upgradeUrl;
+        throw new APIError(response.status, errorCode, errorMessage, upgradeUrl);
       } catch (e) {
         if (e instanceof APIError) throw e;
         throw new APIError(response.status, 'http_error', text || `HTTP ${response.status}`);
