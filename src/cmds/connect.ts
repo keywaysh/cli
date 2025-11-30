@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import open from 'open';
 import ora from 'ora';
 import prompts from 'prompts';
-import { getProviders, getConnections, deleteConnection, getProviderAuthUrl } from '../utils/api.js';
+import { getProviders, getConnections, deleteConnection, getProviderAuthUrl, truncateMessage } from '../utils/api.js';
 import { ensureLogin } from './login.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
 
@@ -107,7 +107,7 @@ export async function connectCommand(provider: string, options: ConnectOptions =
     const message = error instanceof Error ? error.message : 'Connection failed';
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'connect',
-      error: message.slice(0, 200),
+      error: truncateMessage(message),
     });
     console.error(chalk.red(`\n✗ ${message}`));
     process.exit(1);
@@ -191,7 +191,7 @@ export async function disconnectCommand(provider: string, options: ConnectOption
     const message = error instanceof Error ? error.message : 'Disconnect failed';
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'disconnect',
-      error: message.slice(0, 200),
+      error: truncateMessage(message),
     });
     console.error(chalk.red(`\n✗ ${message}`));
     process.exit(1);

@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import prompts from 'prompts';
 import { getCurrentRepoFullName } from '../utils/git.js';
-import { APIError, pushSecrets } from '../utils/api.js';
+import { APIError, pushSecrets, truncateMessage } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
 
@@ -259,7 +259,7 @@ export async function pushCommand(options: PushOptions) {
                `or create '${requestedEnv}' via the dashboard.`;
       }
     } else if (error instanceof Error) {
-      message = error.message.slice(0, 200);
+      message = truncateMessage(error.message);
     } else {
       message = 'Unknown error';
     }
@@ -271,7 +271,7 @@ export async function pushCommand(options: PushOptions) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ Error: ${message}`));
+    console.error(chalk.red(`\n✗ ${message}`));
     if (hint) {
       console.error(chalk.gray(`\n${hint}`));
     }

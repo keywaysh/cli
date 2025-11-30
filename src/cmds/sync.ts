@@ -6,6 +6,7 @@ import {
   getSyncStatus,
   getSyncPreview,
   executeSync,
+  truncateMessage,
 } from '../utils/api.js';
 import { ensureLogin } from './login.js';
 import { detectGitRepo } from '../utils/git.js';
@@ -211,7 +212,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     const message = error instanceof Error ? error.message : 'Sync failed';
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'sync',
-      error: message.slice(0, 200),
+      error: truncateMessage(message),
     });
     console.error(chalk.red(`\n✗ ${message}`));
     process.exit(1);
@@ -326,7 +327,7 @@ async function executeSyncOperation(
       deleted: result.stats.deleted,
     });
   } else {
-    console.error(chalk.red(`\n✗ Sync failed: ${result.error}`));
+    console.error(chalk.red(`\n✗ ${result.error}`));
     process.exit(1);
   }
 }

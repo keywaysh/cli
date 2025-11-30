@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import prompts from 'prompts';
 import { getCurrentRepoFullName } from '../utils/git.js';
-import { APIError, pullSecrets } from '../utils/api.js';
+import { APIError, pullSecrets, truncateMessage } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
 
@@ -81,7 +81,7 @@ export async function pullCommand(options: PullOptions) {
     const message = error instanceof APIError
       ? `API ${error.statusCode}: ${error.message}`
       : error instanceof Error
-        ? error.message.slice(0, 200)
+        ? truncateMessage(error.message)
         : 'Unknown error';
 
     trackEvent(AnalyticsEvents.CLI_ERROR, {
@@ -91,7 +91,7 @@ export async function pullCommand(options: PullOptions) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ Error: ${message}`));
+    console.error(chalk.red(`\n✗ ${message}`));
 
     process.exit(1);
   }

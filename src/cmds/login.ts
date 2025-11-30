@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import readline from 'node:readline';
 import open from 'open';
 import prompts from 'prompts';
-import { pollDeviceLogin, startDeviceLogin, validateToken } from '../utils/api.js';
+import { pollDeviceLogin, startDeviceLogin, validateToken, truncateMessage } from '../utils/api.js';
 import { clearAuth, getAuthFilePath, getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
@@ -200,7 +200,7 @@ export async function loginCommand(options: LoginOptions = {}) {
     const message = error instanceof Error ? error.message : 'Unexpected login error';
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'login',
-      error: message.slice(0, 200),
+      error: truncateMessage(message),
     });
     console.error(chalk.red(`\n✗ ${message}`));
     process.exit(1);
