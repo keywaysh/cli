@@ -20,6 +20,33 @@ import pkg from '../../package.json' with { type: 'json' };
 
 const API_BASE_URL = process.env.KEYWAY_API_URL || INTERNAL_API_URL;
 const USER_AGENT = `keyway-cli/${pkg.version}`;
+const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
+
+/**
+ * Fetch with timeout support
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs / 1000}s. Check your network connection.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 // Security: Enforce HTTPS for production API
 function validateApiUrl(url: string): void {
@@ -371,7 +398,8 @@ export async function getSyncPreview(
     allowDelete: String(options.allowDelete || false),
   });
 
-  const response = await fetch(
+  // Use longer timeout for sync preview as it may involve many secrets
+  const response = await fetchWithTimeout(
     `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync/preview?${params}`,
     {
       method: 'GET',
@@ -379,7 +407,8 @@ export async function getSyncPreview(
         'User-Agent': USER_AGENT,
         Authorization: `Bearer ${accessToken}`,
       },
-    }
+    },
+    60000 // 60 seconds for sync operations
   );
 
   return handleResponse<SyncPreview>(response);
@@ -402,22 +431,27 @@ export async function executeSync(
 ): Promise<SyncResult> {
   const [owner, repo] = repoFullName.split('/');
 
-  const response = await fetch(`${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': USER_AGENT,
-      Authorization: `Bearer ${accessToken}`,
+  // Use longer timeout for sync execution as it may involve many API calls
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        connectionId: options.connectionId,
+        projectId: options.projectId,
+        keywayEnvironment: options.keywayEnvironment || 'production',
+        providerEnvironment: options.providerEnvironment || 'production',
+        direction: options.direction || 'push',
+        allowDelete: options.allowDelete || false,
+      }),
     },
-    body: JSON.stringify({
-      connectionId: options.connectionId,
-      projectId: options.projectId,
-      keywayEnvironment: options.keywayEnvironment || 'production',
-      providerEnvironment: options.providerEnvironment || 'production',
-      direction: options.direction || 'push',
-      allowDelete: options.allowDelete || false,
-    }),
-  });
+    120000 // 2 minutes for sync execution
+  );
 
   return handleResponse<SyncResult>(response);
 }

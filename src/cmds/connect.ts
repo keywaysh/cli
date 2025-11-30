@@ -1,5 +1,6 @@
 import chalk from 'chalk';
 import open from 'open';
+import ora from 'ora';
 import prompts from 'prompts';
 import { getProviders, getConnections, deleteConnection, getProviderAuthUrl } from '../utils/api.js';
 import { ensureLogin } from './login.js';
@@ -51,10 +52,12 @@ export async function connectCommand(provider: string, options: ConnectOptions =
       }
     }
 
-    console.log(chalk.blue(`\n🔗 Connecting to ${providerInfo.displayName}...\n`));
+    console.log(chalk.blue(`\nConnecting to ${providerInfo.displayName}...\n`));
 
     // Open browser for OAuth
     const authUrl = getProviderAuthUrl(provider.toLowerCase());
+    const startTime = new Date();
+
     console.log(chalk.gray('Opening browser for authorization...'));
     console.log(chalk.gray(`If the browser doesn't open, visit: ${authUrl}`));
 
@@ -62,11 +65,42 @@ export async function connectCommand(provider: string, options: ConnectOptions =
       // Silent fail, user has the URL
     });
 
-    console.log(chalk.yellow('\n⏳ Complete the authorization in your browser.'));
-    console.log(chalk.gray('The browser window will confirm when connected.\n'));
+    // Poll for connection confirmation
+    const spinner = ora('Waiting for authorization...').start();
+
+    const maxAttempts = 60; // 5 minutes max (5s * 60)
+    let attempts = 0;
+    let connected = false;
+
+    while (attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      attempts++;
+
+      try {
+        const { connections } = await getConnections(accessToken);
+        const newConn = connections.find(c =>
+          c.provider === provider.toLowerCase() &&
+          new Date(c.createdAt) > startTime
+        );
+
+        if (newConn) {
+          connected = true;
+          spinner.succeed(`Connected to ${providerInfo.displayName}!`);
+          break;
+        }
+      } catch {
+        // Ignore polling errors, keep trying
+      }
+    }
+
+    if (!connected) {
+      spinner.fail('Authorization timeout.');
+      console.log(chalk.gray('\nRun `keyway connections` to check if the connection was established.'));
+    }
 
     trackEvent(AnalyticsEvents.CLI_CONNECT, {
       provider: provider.toLowerCase(),
+      success: connected,
     });
 
   } catch (error) {

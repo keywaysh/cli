@@ -23,6 +23,7 @@ interface SyncOptions {
 
 /**
  * Find matching Vercel project based on Git repo name
+ * Uses strict matching to prevent syncing to wrong project
  */
 function findMatchingProject(
   projects: Array<{ id: string; name: string }>,
@@ -31,15 +32,18 @@ function findMatchingProject(
   const repoName = repoFullName.split('/')[1]?.toLowerCase();
   if (!repoName) return undefined;
 
-  // Exact match first
+  // Exact match first (most reliable)
   const exact = projects.find(p => p.name.toLowerCase() === repoName);
   if (exact) return exact;
 
-  // Partial match
-  return projects.find(p =>
+  // Partial match: only if UNIQUE result to avoid false positives
+  const partial = projects.filter(p =>
     p.name.toLowerCase().includes(repoName) ||
     repoName.includes(p.name.toLowerCase())
   );
+
+  // Only return if exactly one match to avoid syncing to wrong project
+  return partial.length === 1 ? partial[0] : undefined;
 }
 
 /**
@@ -47,6 +51,13 @@ function findMatchingProject(
  */
 export async function syncCommand(provider: string, options: SyncOptions = {}) {
   try {
+    // Validate incompatible options
+    if (options.pull && options.allowDelete) {
+      console.error(chalk.red('Error: --allow-delete cannot be used with --pull'));
+      console.log(chalk.gray('The --allow-delete flag is only for push operations.'));
+      process.exit(1);
+    }
+
     const accessToken = await ensureLogin({ allowPrompt: options.loginPrompt !== false });
 
     // Detect current repo

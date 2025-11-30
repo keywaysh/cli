@@ -93,9 +93,17 @@ export async function runLoginFlow(): Promise<string> {
 }
 
 export async function ensureLogin(options: { allowPrompt?: boolean } = {}): Promise<string> {
-  const envToken = process.env.KEYWAY_TOKEN || process.env.GITHUB_TOKEN;
+  // Only accept KEYWAY_TOKEN from environment
+  // IMPORTANT: Do NOT use GITHUB_TOKEN as a fallback - it's a different credential
+  // and using it would send GitHub tokens to the Keyway API unintentionally
+  const envToken = process.env.KEYWAY_TOKEN;
   if (envToken) {
     return envToken;
+  }
+
+  // Warn if GITHUB_TOKEN is set but we're not using it
+  if (process.env.GITHUB_TOKEN && !process.env.KEYWAY_TOKEN) {
+    console.warn(chalk.yellow('Note: GITHUB_TOKEN found but not used. Set KEYWAY_TOKEN for Keyway authentication.'));
   }
 
   const stored = await getStoredAuth();
