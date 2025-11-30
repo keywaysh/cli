@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import fs from 'fs';
 import path from 'path';
 import prompts from 'prompts';
@@ -21,7 +21,7 @@ export function discoverEnvCandidates(cwd: string): { file: string; env: string 
     const entries = fs.readdirSync(cwd);
     const hasEnvLocal = entries.includes('.env.local');
     if (hasEnvLocal) {
-      console.log(chalk.gray('ℹ️  Detected .env.local — not synced by design (machine-specific secrets)'));
+      console.log(pc.gray('ℹ️  Detected .env.local — not synced by design (machine-specific secrets)'));
     }
 
     const candidates = entries
@@ -61,7 +61,7 @@ interface PushOptions {
 
 export async function pushCommand(options: PushOptions) {
   try {
-    console.log(chalk.blue('🔐 Pushing secrets to Keyway...\n'));
+    console.log(pc.blue('🔐 Pushing secrets to Keyway...\n'));
 
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
     let environment = options.env;
@@ -179,12 +179,12 @@ export async function pushCommand(options: PushOptions) {
       return trimmed.length > 0 && !trimmed.startsWith('#');
     });
 
-    console.log(`File: ${chalk.cyan(envFile)}`);
-    console.log(`Environment: ${chalk.cyan(environment)}`);
-    console.log(`Variables: ${chalk.cyan(lines.length.toString())}`);
+    console.log(`File: ${pc.cyan(envFile)}`);
+    console.log(`Environment: ${pc.cyan(environment)}`);
+    console.log(`Variables: ${pc.cyan(lines.length.toString())}`);
 
     const repoFullName = getCurrentRepoFullName();
-    console.log(`Repository: ${chalk.cyan(repoFullName)}`);
+    console.log(`Repository: ${pc.cyan(repoFullName)}`);
 
     if (!options.yes) {
       const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
@@ -207,7 +207,7 @@ export async function pushCommand(options: PushOptions) {
       );
 
       if (!confirm) {
-        console.log(chalk.yellow('Push aborted.'));
+        console.log(pc.yellow('Push aborted.'));
         return;
       }
     }
@@ -223,21 +223,21 @@ export async function pushCommand(options: PushOptions) {
     console.log('\nUploading secrets...');
     const response = await pushSecrets(repoFullName, environment, content, accessToken);
 
-    console.log(chalk.green('\n✓ ' + response.message));
+    console.log(pc.green('\n✓ ' + response.message));
 
     if (response.stats) {
       const { created, updated, deleted } = response.stats;
       const parts: string[] = [];
-      if (created > 0) parts.push(chalk.green(`+${created} created`));
-      if (updated > 0) parts.push(chalk.yellow(`~${updated} updated`));
-      if (deleted > 0) parts.push(chalk.red(`-${deleted} deleted`));
+      if (created > 0) parts.push(pc.green(`+${created} created`));
+      if (updated > 0) parts.push(pc.yellow(`~${updated} updated`));
+      if (deleted > 0) parts.push(pc.red(`-${deleted} deleted`));
       if (parts.length > 0) {
         console.log(`Stats: ${parts.join(', ')}`);
       }
     }
 
     console.log(`\nYour secrets are now encrypted and stored securely.`);
-    console.log(`To retrieve them, run: ${chalk.cyan(`keyway pull --env ${environment}`)}`);
+    console.log(`To retrieve them, run: ${pc.cyan(`keyway pull --env ${environment}`)}`);
 
     await shutdownAnalytics();
   } catch (error) {
@@ -255,7 +255,7 @@ export async function pushCommand(options: PushOptions) {
         const availableEnvs = envNotFoundMatch[2];
         message = `Environment '${requestedEnv}' does not exist in this vault.`;
         hint = `Available environments: ${availableEnvs}\n` +
-               `Use ${chalk.cyan(`keyway push --env <environment>`)} to specify one, ` +
+               `Use ${pc.cyan(`keyway push --env <environment>`)} to specify one, ` +
                `or create '${requestedEnv}' via the dashboard.`;
       }
     } else if (error instanceof Error) {
@@ -271,9 +271,9 @@ export async function pushCommand(options: PushOptions) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ ${message}`));
+    console.error(pc.red(`\n✗ ${message}`));
     if (hint) {
-      console.error(chalk.gray(`\n${hint}`));
+      console.error(pc.gray(`\n${hint}`));
     }
 
     process.exit(1);

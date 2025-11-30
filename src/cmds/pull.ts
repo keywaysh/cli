@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import fs from 'fs';
 import path from 'path';
 import prompts from 'prompts';
@@ -19,12 +19,12 @@ export async function pullCommand(options: PullOptions) {
     const environment = options.env || 'development';
     const envFile = options.file || '.env';
 
-    console.log(chalk.blue('🔐 Pulling secrets from Keyway...\n'));
+    console.log(pc.blue('🔐 Pulling secrets from Keyway...\n'));
 
-    console.log(`Environment: ${chalk.cyan(environment)}`);
+    console.log(`Environment: ${pc.cyan(environment)}`);
 
     const repoFullName = getCurrentRepoFullName();
-    console.log(`Repository: ${chalk.cyan(repoFullName)}`);
+    console.log(`Repository: ${pc.cyan(repoFullName)}`);
 
     const accessToken = await ensureLogin({ allowPrompt: options.loginPrompt !== false });
 
@@ -40,7 +40,7 @@ export async function pullCommand(options: PullOptions) {
     if (fs.existsSync(envFilePath)) {
       const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
       if (options.yes) {
-        console.log(chalk.yellow(`\n⚠ Overwriting existing file: ${envFile}`));
+        console.log(pc.yellow(`\n⚠ Overwriting existing file: ${envFile}`));
       } else if (!isInteractive) {
         throw new Error(`File ${envFile} exists. Re-run with --yes to overwrite or choose a different --file.`);
       } else {
@@ -59,7 +59,7 @@ export async function pullCommand(options: PullOptions) {
         );
 
         if (!confirm) {
-          console.log(chalk.yellow('Pull aborted.'));
+          console.log(pc.yellow('Pull aborted.'));
           return;
         }
       }
@@ -72,9 +72,9 @@ export async function pullCommand(options: PullOptions) {
       return trimmed.length > 0 && !trimmed.startsWith('#');
     });
 
-    console.log(chalk.green(`\n✓ Secrets downloaded successfully`));
-    console.log(`\nFile: ${chalk.cyan(envFile)}`);
-    console.log(`Variables: ${chalk.cyan(lines.length.toString())}`);
+    console.log(pc.green(`\n✓ Secrets downloaded successfully`));
+    console.log(`\nFile: ${pc.cyan(envFile)}`);
+    console.log(`Variables: ${pc.cyan(lines.length.toString())}`);
 
     await shutdownAnalytics();
   } catch (error) {
@@ -91,7 +91,7 @@ export async function pullCommand(options: PullOptions) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ ${message}`));
+    console.error(pc.red(`\n✗ ${message}`));
 
     process.exit(1);
   }

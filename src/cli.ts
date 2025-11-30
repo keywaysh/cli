@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { initCommand } from './cmds/init.js';
 import { pushCommand } from './cmds/push.js';
 import { pullCommand } from './cmds/pull.js';
@@ -14,8 +14,8 @@ import packageJson from '../package.json' with { type: 'json' };
 const program = new Command();
 
 const showBanner = () => {
-  const text = chalk.cyan.bold('Keyway CLI');
-  const subtitle = chalk.gray('GitHub-native secrets manager for dev teams');
+  const text = pc.cyan.bold('Keyway CLI');
+  const subtitle = pc.gray('GitHub-native secrets manager for dev teams');
   console.log(`\n${text}\n${subtitle}\n`);
 };
 
@@ -120,6 +120,6 @@ program
   });
 
 program.parseAsync().catch((error) => {
-  console.error(chalk.red('Error:'), error.message || error);
+  console.error(pc.red('Error:'), error.message || error);
   process.exit(1);
 });

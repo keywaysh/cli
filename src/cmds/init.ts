@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import prompts from 'prompts';
 import { getCurrentRepoFullName } from '../utils/git.js';
 import { APIError, initVault, truncateMessage } from '../utils/api.js';
@@ -18,8 +18,8 @@ export async function initCommand(options: InitOptions = {}) {
     const repoFullName = getCurrentRepoFullName();
     const dashboardLink = `${DASHBOARD_URL}/${repoFullName}`;
 
-    console.log(chalk.blue('🔐 Initializing Keyway vault...\n'));
-    console.log(`  ${chalk.gray('Repository:')} ${chalk.white(repoFullName)}`);
+    console.log(pc.blue('🔐 Initializing Keyway vault...\n'));
+    console.log(`  ${pc.gray('Repository:')} ${pc.white(repoFullName)}`);
 
     const accessToken = await ensureLogin({ allowPrompt: options.loginPrompt !== false });
 
@@ -27,13 +27,13 @@ export async function initCommand(options: InitOptions = {}) {
 
     const response = await initVault(repoFullName, accessToken);
 
-    console.log(chalk.green('✓ Vault created!'));
+    console.log(pc.green('✓ Vault created!'));
 
     // Add badge to README (silent mode - we handle the message ourselves)
     try {
       const badgeAdded = await addBadgeToReadme(true);
       if (badgeAdded) {
-        console.log(chalk.green('✓ Badge added to README.md'));
+        console.log(pc.green('✓ Badge added to README.md'));
       }
     } catch {
       // Silent fail for badge
@@ -45,7 +45,7 @@ export async function initCommand(options: InitOptions = {}) {
     const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
 
     if (envCandidates.length > 0 && isInteractive) {
-      console.log(chalk.gray(`  Found ${envCandidates.length} env file(s): ${envCandidates.map(c => c.file).join(', ')}\n`));
+      console.log(pc.gray(`  Found ${envCandidates.length} env file(s): ${envCandidates.map(c => c.file).join(', ')}\n`));
 
       const { shouldPush } = await prompts({
         type: 'confirm',
@@ -62,17 +62,17 @@ export async function initCommand(options: InitOptions = {}) {
     }
 
     // Show next steps if not pushing
-    console.log(chalk.dim('─'.repeat(50)));
+    console.log(pc.dim('─'.repeat(50)));
     console.log('');
 
     if (envCandidates.length === 0) {
-      console.log(`  ${chalk.yellow('→')} Create a ${chalk.cyan('.env')} file with your secrets`);
-      console.log(`  ${chalk.yellow('→')} Run ${chalk.cyan('keyway push')} to sync them\n`);
+      console.log(`  ${pc.yellow('→')} Create a ${pc.cyan('.env')} file with your secrets`);
+      console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync them\n`);
     } else {
-      console.log(`  ${chalk.yellow('→')} Run ${chalk.cyan('keyway push')} to sync your secrets\n`);
+      console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets\n`);
     }
 
-    console.log(`  ${chalk.blue('⎔')} Dashboard: ${chalk.underline(dashboardLink)}`);
+    console.log(`  ${pc.blue('⎔')} Dashboard: ${pc.underline(dashboardLink)}`);
     console.log('');
 
     await shutdownAnalytics();
@@ -80,9 +80,9 @@ export async function initCommand(options: InitOptions = {}) {
     // Handle specific error cases with friendly messages
     if (error instanceof APIError) {
       if (error.statusCode === 409) {
-        console.log(chalk.yellow('\n⚠ Vault already exists for this repository.\n'));
-        console.log(`  ${chalk.yellow('→')} Run ${chalk.cyan('keyway push')} to sync your secrets`);
-        console.log(`  ${chalk.blue('⎔')} Dashboard: ${chalk.underline(`${DASHBOARD_URL}/${getCurrentRepoFullName()}`)}`);
+        console.log(pc.yellow('\n⚠ Vault already exists for this repository.\n'));
+        console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets`);
+        console.log(`  ${pc.blue('⎔')} Dashboard: ${pc.underline(`${DASHBOARD_URL}/${getCurrentRepoFullName()}`)}`);
         console.log('');
         await shutdownAnalytics();
         return;
@@ -90,15 +90,15 @@ export async function initCommand(options: InitOptions = {}) {
 
       if (error.error === 'PLAN_LIMIT_REACHED') {
         console.log('');
-        console.log(chalk.dim('─'.repeat(50)));
+        console.log(pc.dim('─'.repeat(50)));
         console.log('');
-        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade Required')}`);
+        console.log(`  ${pc.yellow('⚡')} ${pc.bold('Upgrade Required')}`);
         console.log('');
-        console.log(chalk.gray(`  ${error.message}`));
+        console.log(pc.gray(`  ${error.message}`));
         console.log('');
-        console.log(`  ${chalk.cyan('→')} ${chalk.underline(error.upgradeUrl || 'https://keyway.sh/upgrade')}`);
+        console.log(`  ${pc.cyan('→')} ${pc.underline(error.upgradeUrl || 'https://keyway.sh/upgrade')}`);
         console.log('');
-        console.log(chalk.dim('─'.repeat(50)));
+        console.log(pc.dim('─'.repeat(50)));
         console.log('');
         await shutdownAnalytics();
         process.exit(1);
@@ -118,7 +118,7 @@ export async function initCommand(options: InitOptions = {}) {
 
     await shutdownAnalytics();
 
-    console.error(chalk.red(`\n✗ ${message}`));
+    console.error(pc.red(`\n✗ ${message}`));
 
     process.exit(1);
   }

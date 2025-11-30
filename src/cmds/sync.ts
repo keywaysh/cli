@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import prompts from 'prompts';
 import {
   getConnections,
@@ -54,8 +54,8 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
   try {
     // Validate incompatible options
     if (options.pull && options.allowDelete) {
-      console.error(chalk.red('Error: --allow-delete cannot be used with --pull'));
-      console.log(chalk.gray('The --allow-delete flag is only for push operations.'));
+      console.error(pc.red('Error: --allow-delete cannot be used with --pull'));
+      console.log(pc.gray('The --allow-delete flag is only for push operations.'));
       process.exit(1);
     }
 
@@ -64,20 +64,20 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     // Detect current repo
     const repoFullName = detectGitRepo();
     if (!repoFullName) {
-      console.error(chalk.red('Could not detect Git repository.'));
-      console.log(chalk.gray('Run this command from a Git repository directory.'));
+      console.error(pc.red('Could not detect Git repository.'));
+      console.log(pc.gray('Run this command from a Git repository directory.'));
       process.exit(1);
     }
 
-    console.log(chalk.gray(`Repository: ${repoFullName}`));
+    console.log(pc.gray(`Repository: ${repoFullName}`));
 
     // Get provider connection
     const { connections } = await getConnections(accessToken);
     const connection = connections.find(c => c.provider === provider.toLowerCase());
 
     if (!connection) {
-      console.error(chalk.red(`Not connected to ${provider}.`));
-      console.log(chalk.gray(`Run: keyway connect ${provider}`));
+      console.error(pc.red(`Not connected to ${provider}.`));
+      console.log(pc.gray(`Run: keyway connect ${provider}`));
       process.exit(1);
     }
 
@@ -85,7 +85,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     const { projects } = await getConnectionProjects(accessToken, connection.id);
 
     if (projects.length === 0) {
-      console.error(chalk.red(`No projects found in your ${provider} account.`));
+      console.error(pc.red(`No projects found in your ${provider} account.`));
       process.exit(1);
     }
 
@@ -98,9 +98,9 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         p.id === options.project || p.name.toLowerCase() === options.project?.toLowerCase()
       );
       if (!found) {
-        console.error(chalk.red(`Project not found: ${options.project}`));
-        console.log(chalk.gray('Available projects:'));
-        projects.forEach(p => console.log(chalk.gray(`  - ${p.name}`)));
+        console.error(pc.red(`Project not found: ${options.project}`));
+        console.log(pc.gray('Available projects:'));
+        projects.forEach(p => console.log(pc.gray(`  - ${p.name}`)));
         process.exit(1);
       }
       selectedProject = found;
@@ -109,7 +109,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       const autoMatch = findMatchingProject(projects, repoFullName);
 
       if (autoMatch && projects.length > 1) {
-        console.log(chalk.gray(`Detected project: ${autoMatch.name}`));
+        console.log(pc.gray(`Detected project: ${autoMatch.name}`));
         const { useDetected } = await prompts({
           type: 'confirm',
           name: 'useDetected',
@@ -141,7 +141,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         });
 
         if (!projectChoice) {
-          console.log(chalk.gray('Cancelled.'));
+          console.log(pc.gray('Cancelled.'));
           process.exit(0);
         }
 
@@ -154,8 +154,8 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     const direction = options.pull ? 'pull' : 'push';
     const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
 
-    console.log(chalk.gray(`Project: ${selectedProject.name}`));
-    console.log(chalk.gray(`Direction: ${direction === 'push' ? 'Keyway → ' + providerName : providerName + ' → Keyway'}`));
+    console.log(pc.gray(`Project: ${selectedProject.name}`));
+    console.log(pc.gray(`Direction: ${direction === 'push' ? 'Keyway → ' + providerName : providerName + ' → Keyway'}`));
 
     // First-time detection
     const status = await getSyncStatus(
@@ -167,7 +167,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     );
 
     if (status.isFirstSync && !options.pull && status.vaultIsEmpty && status.providerHasSecrets) {
-      console.log(chalk.yellow(`\n⚠️  Your Keyway vault is empty, but ${providerName} has ${status.providerSecretCount} secrets.`));
+      console.log(pc.yellow(`\n⚠️  Your Keyway vault is empty, but ${providerName} has ${status.providerSecretCount} secrets.`));
 
       const { importFirst } = await prompts({
         type: 'confirm',
@@ -214,7 +214,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       command: 'sync',
       error: truncateMessage(message),
     });
-    console.error(chalk.red(`\n✗ ${message}`));
+    console.error(pc.red(`\n✗ ${message}`));
     process.exit(1);
   }
 }
@@ -246,39 +246,39 @@ async function executeSyncOperation(
   const totalChanges = preview.toCreate.length + preview.toUpdate.length + preview.toDelete.length;
 
   if (totalChanges === 0) {
-    console.log(chalk.green('\n✓ Already in sync. No changes needed.'));
+    console.log(pc.green('\n✓ Already in sync. No changes needed.'));
     return;
   }
 
   // Show preview
-  console.log(chalk.blue('\n📋 Sync Preview\n'));
+  console.log(pc.blue('\n📋 Sync Preview\n'));
 
   if (preview.toCreate.length > 0) {
-    console.log(chalk.green(`  + ${preview.toCreate.length} to create`));
-    preview.toCreate.slice(0, 5).forEach(key => console.log(chalk.gray(`    ${key}`)));
+    console.log(pc.green(`  + ${preview.toCreate.length} to create`));
+    preview.toCreate.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
     if (preview.toCreate.length > 5) {
-      console.log(chalk.gray(`    ... and ${preview.toCreate.length - 5} more`));
+      console.log(pc.gray(`    ... and ${preview.toCreate.length - 5} more`));
     }
   }
 
   if (preview.toUpdate.length > 0) {
-    console.log(chalk.yellow(`  ~ ${preview.toUpdate.length} to update`));
-    preview.toUpdate.slice(0, 5).forEach(key => console.log(chalk.gray(`    ${key}`)));
+    console.log(pc.yellow(`  ~ ${preview.toUpdate.length} to update`));
+    preview.toUpdate.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
     if (preview.toUpdate.length > 5) {
-      console.log(chalk.gray(`    ... and ${preview.toUpdate.length - 5} more`));
+      console.log(pc.gray(`    ... and ${preview.toUpdate.length - 5} more`));
     }
   }
 
   if (preview.toDelete.length > 0) {
-    console.log(chalk.red(`  - ${preview.toDelete.length} to delete`));
-    preview.toDelete.slice(0, 5).forEach(key => console.log(chalk.gray(`    ${key}`)));
+    console.log(pc.red(`  - ${preview.toDelete.length} to delete`));
+    preview.toDelete.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
     if (preview.toDelete.length > 5) {
-      console.log(chalk.gray(`    ... and ${preview.toDelete.length - 5} more`));
+      console.log(pc.gray(`    ... and ${preview.toDelete.length - 5} more`));
     }
   }
 
   if (preview.toSkip.length > 0) {
-    console.log(chalk.gray(`  ○ ${preview.toSkip.length} unchanged`));
+    console.log(pc.gray(`  ○ ${preview.toSkip.length} unchanged`));
   }
 
   console.log('');
@@ -294,13 +294,13 @@ async function executeSyncOperation(
     });
 
     if (!confirm) {
-      console.log(chalk.gray('Cancelled.'));
+      console.log(pc.gray('Cancelled.'));
       return;
     }
   }
 
   // Execute
-  console.log(chalk.blue('\n⏳ Syncing...\n'));
+  console.log(pc.blue('\n⏳ Syncing...\n'));
 
   const result = await executeSync(accessToken, repoFullName, {
     connectionId,
@@ -312,11 +312,11 @@ async function executeSyncOperation(
   });
 
   if (result.success) {
-    console.log(chalk.green('✓ Sync complete'));
-    console.log(chalk.gray(`  Created: ${result.stats.created}`));
-    console.log(chalk.gray(`  Updated: ${result.stats.updated}`));
+    console.log(pc.green('✓ Sync complete'));
+    console.log(pc.gray(`  Created: ${result.stats.created}`));
+    console.log(pc.gray(`  Updated: ${result.stats.updated}`));
     if (result.stats.deleted > 0) {
-      console.log(chalk.gray(`  Deleted: ${result.stats.deleted}`));
+      console.log(pc.gray(`  Deleted: ${result.stats.deleted}`));
     }
 
     trackEvent(AnalyticsEvents.CLI_SYNC, {
@@ -327,7 +327,7 @@ async function executeSyncOperation(
       deleted: result.stats.deleted,
     });
   } else {
-    console.error(chalk.red(`\n✗ ${result.error}`));
+    console.error(pc.red(`\n✗ ${result.error}`));
     process.exit(1);
   }
 }

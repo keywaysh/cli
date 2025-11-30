@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import prompts from 'prompts';
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { detectGitRepo } from '../utils/git.js';
 
 export function generateBadge(repo: string): string {
@@ -47,7 +47,7 @@ async function ensureReadme(repoName: string, cwd: string): Promise<string | nul
 
   const isInteractive = process.stdin.isTTY && process.stdout.isTTY;
   if (!isInteractive) {
-    console.log(chalk.yellow('No README found. Run "keyway readme add-badge" from a repo with a README.'));
+    console.log(pc.yellow('No README found. Run "keyway readme add-badge" from a repo with a README.'));
     return null;
   }
 
@@ -64,7 +64,7 @@ async function ensureReadme(repoName: string, cwd: string): Promise<string | nul
   );
 
   if (!confirm) {
-    console.log(chalk.yellow('Skipping badge insertion (no README).'));
+    console.log(pc.yellow('Skipping badge insertion (no README).'));
     return null;
   }
 
@@ -90,14 +90,14 @@ export async function addBadgeToReadme(silent = false): Promise<boolean> {
 
   if (updated === content) {
     if (!silent) {
-      console.log(chalk.gray('Keyway badge already present in README.'));
+      console.log(pc.gray('Keyway badge already present in README.'));
     }
     return false;
   }
 
   fs.writeFileSync(readmePath, updated, 'utf-8');
   if (!silent) {
-    console.log(chalk.green(`✓ Keyway badge added to ${path.basename(readmePath)}`));
+    console.log(pc.green(`✓ Keyway badge added to ${path.basename(readmePath)}`));
   }
   return true;
 }

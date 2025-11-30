@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import readline from 'node:readline';
 import open from 'open';
 import prompts from 'prompts';
@@ -34,7 +34,7 @@ async function promptYesNo(question: string, defaultYes = true): Promise<boolean
 }
 
 export async function runLoginFlow(): Promise<string> {
-  console.log(chalk.blue('🔐 Starting Keyway login...\n'));
+  console.log(pc.blue('🔐 Starting Keyway login...\n'));
 
   const repoName = detectGitRepo();
   const start = await startDeviceLogin(repoName);
@@ -44,12 +44,12 @@ export async function runLoginFlow(): Promise<string> {
     throw new Error('Missing verification URL from the auth server.');
   }
 
-  console.log(`Code: ${chalk.green.bold(start.userCode)}`);
+  console.log(`Code: ${pc.green.bold(start.userCode)}`);
   console.log('Waiting for auth...');
 
   // Best-effort open browser; user still sees the URL.
   open(verifyUrl).catch(() => {
-    console.log(chalk.gray(`Open this URL in your browser: ${verifyUrl}`));
+    console.log(pc.gray(`Open this URL in your browser: ${verifyUrl}`));
   });
 
   const pollIntervalMs = (start.interval ?? 5) * 1000;
@@ -81,9 +81,9 @@ export async function runLoginFlow(): Promise<string> {
         repo: repoName,
       });
 
-      console.log(chalk.green('\n✓ Login successful'));
+      console.log(pc.green('\n✓ Login successful'));
       if (result.githubLogin) {
-        console.log(`Authenticated GitHub user: ${chalk.cyan(result.githubLogin)}`);
+        console.log(`Authenticated GitHub user: ${pc.cyan(result.githubLogin)}`);
       }
       return result.keywayToken;
     }
@@ -103,7 +103,7 @@ export async function ensureLogin(options: { allowPrompt?: boolean } = {}): Prom
 
   // Warn if GITHUB_TOKEN is set but we're not using it
   if (process.env.GITHUB_TOKEN && !process.env.KEYWAY_TOKEN) {
-    console.warn(chalk.yellow('Note: GITHUB_TOKEN found but not used. Set KEYWAY_TOKEN for Keyway authentication.'));
+    console.warn(pc.yellow('Note: GITHUB_TOKEN found but not used. Set KEYWAY_TOKEN for Keyway authentication.'));
   }
 
   const stored = await getStoredAuth();
@@ -129,7 +129,7 @@ export async function ensureLogin(options: { allowPrompt?: boolean } = {}): Prom
 async function runTokenLogin(): Promise<string> {
   const repoName = detectGitRepo();
   if (repoName) {
-    console.log(`📁 Detected: ${chalk.cyan(repoName)}`);
+    console.log(`📁 Detected: ${pc.cyan(repoName)}`);
   }
 
   const description = repoName ? `Keyway CLI for ${repoName}` : 'Keyway CLI';
@@ -137,11 +137,11 @@ async function runTokenLogin(): Promise<string> {
 
   console.log('Opening GitHub...');
   open(url).catch(() => {
-    console.log(chalk.gray(`Open this URL in your browser: ${url}`));
+    console.log(pc.gray(`Open this URL in your browser: ${url}`));
   });
 
-  console.log(chalk.gray('Select the detected repo (or scope manually).'));
-  console.log(chalk.gray('Permissions: Metadata → Read-only; Account permissions: None.'));
+  console.log(pc.gray('Select the detected repo (or scope manually).'));
+  console.log(pc.gray('Permissions: Metadata → Read-only; Account permissions: None.'));
 
   const { token } = await prompts(
     {
@@ -181,7 +181,7 @@ async function runTokenLogin(): Promise<string> {
     repo: repoName,
   });
 
-  console.log(chalk.green('✅ Authenticated'), `as ${chalk.cyan(`@${validation.username}`)}`);
+  console.log(pc.green('✅ Authenticated'), `as ${pc.cyan(`@${validation.username}`)}`);
   return trimmedToken;
 }
 
@@ -202,13 +202,13 @@ export async function loginCommand(options: LoginOptions = {}) {
       command: 'login',
       error: truncateMessage(message),
     });
-    console.error(chalk.red(`\n✗ ${message}`));
+    console.error(pc.red(`\n✗ ${message}`));
     process.exit(1);
   }
 }
 
 export async function logoutCommand() {
   clearAuth();
-  console.log(chalk.green('✓ Logged out of Keyway'));
-  console.log(chalk.gray(`Auth cache cleared: ${getAuthFilePath()}`));
+  console.log(pc.green('✓ Logged out of Keyway'));
+  console.log(pc.gray(`Auth cache cleared: ${getAuthFilePath()}`));
 }

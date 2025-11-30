@@ -1,4 +1,4 @@
-import chalk from 'chalk';
+import pc from 'picocolors';
 import { runAllChecks, DoctorSummary } from '../core/doctor.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
 import { truncateMessage } from '../utils/api.js';
@@ -10,9 +10,9 @@ interface DoctorOptions {
 
 function formatSummary(results: DoctorSummary) {
   const parts = [
-    chalk.green(`${results.summary.pass} passed`),
-    results.summary.warn > 0 ? chalk.yellow(`${results.summary.warn} warnings`) : null,
-    results.summary.fail > 0 ? chalk.red(`${results.summary.fail} failed`) : null,
+    pc.green(`${results.summary.pass} passed`),
+    results.summary.warn > 0 ? pc.yellow(`${results.summary.warn} warnings`) : null,
+    results.summary.fail > 0 ? pc.red(`${results.summary.fail} failed`) : null,
   ].filter(Boolean);
   return parts.join(', ');
 }
@@ -33,27 +33,27 @@ export async function doctorCommand(options: DoctorOptions = {}) {
       process.exit(results.exitCode);
     }
 
-    console.log(chalk.cyan('\n🔍 Keyway Doctor - Environment Check\n'));
+    console.log(pc.cyan('\n🔍 Keyway Doctor - Environment Check\n'));
 
     results.checks.forEach((check) => {
       const icon =
         check.status === 'pass'
-          ? chalk.green('✓')
+          ? pc.green('✓')
           : check.status === 'warn'
-            ? chalk.yellow('!')
-            : chalk.red('✗');
-      const detail = check.detail ? chalk.dim(` — ${check.detail}`) : '';
+            ? pc.yellow('!')
+            : pc.red('✗');
+      const detail = check.detail ? pc.dim(` — ${check.detail}`) : '';
       console.log(`  ${icon} ${check.name}${detail}`);
     });
 
     console.log(`\nSummary: ${formatSummary(results)}`);
 
     if (results.summary.fail > 0) {
-      console.log(chalk.red('⚠ Some checks failed. Please resolve the issues above before using Keyway.'));
+      console.log(pc.red('⚠ Some checks failed. Please resolve the issues above before using Keyway.'));
     } else if (results.summary.warn > 0) {
-      console.log(chalk.yellow('⚠ Some warnings detected. Keyway should work but consider addressing them.'));
+      console.log(pc.yellow('⚠ Some warnings detected. Keyway should work but consider addressing them.'));
     } else {
-      console.log(chalk.green('✨ All checks passed! Your environment is ready for Keyway.'));
+      console.log(pc.green('✨ All checks passed! Your environment is ready for Keyway.'));
     }
 
     process.exit(results.exitCode);
@@ -76,7 +76,7 @@ export async function doctorCommand(options: DoctorOptions = {}) {
       };
       process.stdout.write(JSON.stringify(errorResult, null, 0) + '\n');
     } else {
-      console.error(chalk.red(`\n✗ ${message}`));
+      console.error(pc.red(`\n✗ ${message}`));
     }
     process.exit(1);
   }
