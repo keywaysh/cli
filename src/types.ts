@@ -61,3 +61,50 @@ export interface ValidateTokenResponse {
   username: string;
   githubId?: string;
 }
+
+// Provider integrations
+export interface ProviderInfo {
+  name: string;
+  displayName: string;
+  configured: boolean;
+}
+
+export interface ConnectionInfo {
+  id: string;
+  provider: string;
+  providerUserId: string | null;
+  providerTeamId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderProject {
+  id: string;
+  name: string;
+  framework?: string;
+}
+
+export interface SyncStatusInfo {
+  isFirstSync: boolean;
+  vaultIsEmpty: boolean;
+  providerHasSecrets: boolean;
+  providerSecretCount: number;
+}
+
+export interface SyncPreview {
+  toCreate: string[];
+  toUpdate: string[];
+  toDelete: string[];
+  toSkip: string[];
+}
+
+export interface SyncResult {
+  success: boolean;
+  stats: {
+    created: number;
+    updated: number;
+    deleted: number;
+    total: number;
+  };
+  error?: string;
+}

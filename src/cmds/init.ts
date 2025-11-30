@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 import prompts from 'prompts';
 import { getCurrentRepoFullName } from '../utils/git.js';
-import { APIError, initVault } from '../utils/api.js';
+import { APIError, initVault, truncateMessage } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
 import { addBadgeToReadme } from './readme.js';
@@ -92,10 +92,9 @@ export async function initCommand(options: InitOptions = {}) {
         console.log('');
         console.log(chalk.dim('─'.repeat(50)));
         console.log('');
-        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade to Pro')}`);
+        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade Required')}`);
         console.log('');
-        console.log(chalk.gray('  You\'ve reached the limit of your free plan.'));
-        console.log(chalk.gray('  Upgrade to Pro for unlimited private repositories.'));
+        console.log(chalk.gray(`  ${error.message}`));
         console.log('');
         console.log(`  ${chalk.cyan('→')} ${chalk.underline(error.upgradeUrl || 'https://keyway.sh/upgrade')}`);
         console.log('');
@@ -109,7 +108,7 @@ export async function initCommand(options: InitOptions = {}) {
     const message = error instanceof APIError
       ? error.message
       : error instanceof Error
-        ? error.message.slice(0, 200)
+        ? truncateMessage(error.message)
         : 'Unknown error';
 
     trackEvent(AnalyticsEvents.CLI_ERROR, {

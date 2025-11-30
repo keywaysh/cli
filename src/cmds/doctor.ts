@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { runAllChecks, DoctorSummary } from '../core/doctor.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
+import { truncateMessage } from '../utils/api.js';
 
 interface DoctorOptions {
   json?: boolean;
@@ -57,7 +58,7 @@ export async function doctorCommand(options: DoctorOptions = {}) {
 
     process.exit(results.exitCode);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Doctor failed';
+    const message = error instanceof Error ? truncateMessage(error.message) : 'Doctor failed';
     trackEvent(AnalyticsEvents.CLI_DOCTOR, {
       pass: 0,
       warn: 0,
@@ -75,7 +76,7 @@ export async function doctorCommand(options: DoctorOptions = {}) {
       };
       process.stdout.write(JSON.stringify(errorResult, null, 0) + '\n');
     } else {
-      console.error(chalk.red(`✖ Doctor check failed: ${message}`));
+      console.error(chalk.red(`\n✗ ${message}`));
     }
     process.exit(1);
   }

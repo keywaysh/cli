@@ -2,7 +2,7 @@ import chalk from 'chalk';
 import readline from 'node:readline';
 import open from 'open';
 import prompts from 'prompts';
-import { pollDeviceLogin, startDeviceLogin, validateToken } from '../utils/api.js';
+import { pollDeviceLogin, startDeviceLogin, validateToken, truncateMessage } from '../utils/api.js';
 import { clearAuth, getAuthFilePath, getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
@@ -93,9 +93,17 @@ export async function runLoginFlow(): Promise<string> {
 }
 
 export async function ensureLogin(options: { allowPrompt?: boolean } = {}): Promise<string> {
-  const envToken = process.env.KEYWAY_TOKEN || process.env.GITHUB_TOKEN;
+  // Only accept KEYWAY_TOKEN from environment
+  // IMPORTANT: Do NOT use GITHUB_TOKEN as a fallback - it's a different credential
+  // and using it would send GitHub tokens to the Keyway API unintentionally
+  const envToken = process.env.KEYWAY_TOKEN;
   if (envToken) {
     return envToken;
+  }
+
+  // Warn if GITHUB_TOKEN is set but we're not using it
+  if (process.env.GITHUB_TOKEN && !process.env.KEYWAY_TOKEN) {
+    console.warn(chalk.yellow('Note: GITHUB_TOKEN found but not used. Set KEYWAY_TOKEN for Keyway authentication.'));
   }
 
   const stored = await getStoredAuth();
@@ -192,7 +200,7 @@ export async function loginCommand(options: LoginOptions = {}) {
     const message = error instanceof Error ? error.message : 'Unexpected login error';
     trackEvent(AnalyticsEvents.CLI_ERROR, {
       command: 'login',
-      error: message.slice(0, 200),
+      error: truncateMessage(message),
     });
     console.error(chalk.red(`\n✗ ${message}`));
     process.exit(1);
