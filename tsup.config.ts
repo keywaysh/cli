@@ -7,5 +7,5 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   shims: true,
-  target: 'node18'
+  target: 'node18',
 })

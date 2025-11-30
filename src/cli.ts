@@ -14,7 +14,7 @@ import packageJson from '../package.json' with { type: 'json' };
 const program = new Command();
 
 const showBanner = () => {
-  const text = pc.cyan.bold('Keyway CLI');
+  const text = pc.bold(pc.cyan('Keyway CLI'));
   const subtitle = pc.gray('GitHub-native secrets manager for dev teams');
   console.log(`\n${text}\n${subtitle}\n`);
 };

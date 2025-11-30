@@ -44,7 +44,7 @@ export async function runLoginFlow(): Promise<string> {
     throw new Error('Missing verification URL from the auth server.');
   }
 
-  console.log(`Code: ${pc.green.bold(start.userCode)}`);
+  console.log(`Code: ${pc.bold(pc.green(start.userCode))}`);
   console.log('Waiting for auth...');
 
   // Best-effort open browser; user still sees the URL.
