@@ -12,6 +12,7 @@
   ],
   "scripts": {
     "dev": "pnpm exec tsx src/cli.ts",
+    "dev:local": "NODE_TLS_REJECT_UNAUTHORIZED=0 KEYWAY_API_URL=https://localhost/api pnpm exec tsx src/cli.ts",
     "build": "pnpm exec tsup",
     "build:watch": "pnpm exec tsup --watch",
     "prepublishOnly": "pnpm run build",
@@ -47,6 +48,7 @@
     "commander": "^14.0.0",
     "conf": "^15.0.2",
     "open": "^11.0.0",
+    "ora": "^9.0.0",
     "posthog-node": "^3.5.0",
     "prompts": "^2.4.2"
   },

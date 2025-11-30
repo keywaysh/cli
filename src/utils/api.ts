@@ -8,12 +8,45 @@ import type {
   DeviceStartResponse,
   DevicePollResponse,
   ValidateTokenResponse,
+  ProviderInfo,
+  ConnectionInfo,
+  ProviderProject,
+  SyncStatusInfo,
+  SyncPreview,
+  SyncResult,
 } from '../types.js';
 import { INTERNAL_API_URL } from '../config/internal.js';
 import pkg from '../../package.json' with { type: 'json' };
 
 const API_BASE_URL = process.env.KEYWAY_API_URL || INTERNAL_API_URL;
 const USER_AGENT = `keyway-cli/${pkg.version}`;
+const DEFAULT_TIMEOUT_MS = 30000; // 30 seconds
+
+/**
+ * Fetch with timeout support
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs / 1000}s. Check your network connection.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 // Security: Enforce HTTPS for production API
 function validateApiUrl(url: string): void {
@@ -235,4 +268,190 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
   });
 
   return handleResponse<ValidateTokenResponse>(response);
+}
+
+// ==================== Provider Integrations ====================
+
+/**
+ * Get list of available providers
+ */
+export async function getProviders(): Promise<{ providers: ProviderInfo[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/integrations`, {
+    method: 'GET',
+    headers: {
+      'User-Agent': USER_AGENT,
+    },
+  });
+
+  return handleResponse<{ providers: ProviderInfo[] }>(response);
+}
+
+/**
+ * Get user's provider connections
+ */
+export async function getConnections(accessToken: string): Promise<{ connections: ConnectionInfo[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/integrations/connections`, {
+    method: 'GET',
+    headers: {
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return handleResponse<{ connections: ConnectionInfo[] }>(response);
+}
+
+/**
+ * Delete a provider connection
+ */
+export async function deleteConnection(accessToken: string, connectionId: string): Promise<{ success: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/v1/integrations/connections/${connectionId}`, {
+    method: 'DELETE',
+    headers: {
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return handleResponse<{ success: boolean }>(response);
+}
+
+/**
+ * Get OAuth authorization URL for a provider
+ */
+export function getProviderAuthUrl(provider: string, redirectUri?: string): string {
+  const params = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+  return `${API_BASE_URL}/v1/integrations/${provider}/authorize${params}`;
+}
+
+/**
+ * Get projects for a connection
+ */
+export async function getConnectionProjects(
+  accessToken: string,
+  connectionId: string
+): Promise<{ projects: ProviderProject[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/integrations/connections/${connectionId}/projects`, {
+    method: 'GET',
+    headers: {
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  return handleResponse<{ projects: ProviderProject[] }>(response);
+}
+
+/**
+ * Get sync status (for first-time detection)
+ */
+export async function getSyncStatus(
+  accessToken: string,
+  repoFullName: string,
+  connectionId: string,
+  projectId: string,
+  environment: string = 'production'
+): Promise<SyncStatusInfo> {
+  const [owner, repo] = repoFullName.split('/');
+  const params = new URLSearchParams({
+    connectionId,
+    projectId,
+    environment,
+  });
+
+  const response = await fetch(
+    `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync/status?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return handleResponse<SyncStatusInfo>(response);
+}
+
+/**
+ * Get sync preview (what would change)
+ */
+export async function getSyncPreview(
+  accessToken: string,
+  repoFullName: string,
+  options: {
+    connectionId: string;
+    projectId: string;
+    keywayEnvironment?: string;
+    providerEnvironment?: string;
+    direction?: 'push' | 'pull';
+    allowDelete?: boolean;
+  }
+): Promise<SyncPreview> {
+  const [owner, repo] = repoFullName.split('/');
+  const params = new URLSearchParams({
+    connectionId: options.connectionId,
+    projectId: options.projectId,
+    keywayEnvironment: options.keywayEnvironment || 'production',
+    providerEnvironment: options.providerEnvironment || 'production',
+    direction: options.direction || 'push',
+    allowDelete: String(options.allowDelete || false),
+  });
+
+  // Use longer timeout for sync preview as it may involve many secrets
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync/preview?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+    60000 // 60 seconds for sync operations
+  );
+
+  return handleResponse<SyncPreview>(response);
+}
+
+/**
+ * Execute a sync operation
+ */
+export async function executeSync(
+  accessToken: string,
+  repoFullName: string,
+  options: {
+    connectionId: string;
+    projectId: string;
+    keywayEnvironment?: string;
+    providerEnvironment?: string;
+    direction?: 'push' | 'pull';
+    allowDelete?: boolean;
+  }
+): Promise<SyncResult> {
+  const [owner, repo] = repoFullName.split('/');
+
+  // Use longer timeout for sync execution as it may involve many API calls
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        connectionId: options.connectionId,
+        projectId: options.projectId,
+        keywayEnvironment: options.keywayEnvironment || 'production',
+        providerEnvironment: options.providerEnvironment || 'production',
+        direction: options.direction || 'push',
+        allowDelete: options.allowDelete || false,
+      }),
+    },
+    120000 // 2 minutes for sync execution
+  );
+
+  return handleResponse<SyncResult>(response);
 }

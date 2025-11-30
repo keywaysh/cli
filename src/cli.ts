@@ -7,6 +7,8 @@ import { pushCommand } from './cmds/push.js';
 import { pullCommand } from './cmds/pull.js';
 import { loginCommand, logoutCommand } from './cmds/login.js';
 import { doctorCommand } from './cmds/doctor.js';
+import { connectCommand, connectionsCommand, disconnectCommand } from './cmds/connect.js';
+import { syncCommand } from './cmds/sync.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
@@ -76,6 +78,45 @@ program
   .option('--strict', 'Treat warnings as failures', false)
   .action(async (options) => {
     await doctorCommand(options);
+  });
+
+// Provider integrations
+program
+  .command('connect <provider>')
+  .description('Connect to an external provider (e.g., vercel)')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (provider, options) => {
+    await connectCommand(provider, options);
+  });
+
+program
+  .command('connections')
+  .description('List your provider connections')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (options) => {
+    await connectionsCommand(options);
+  });
+
+program
+  .command('disconnect <provider>')
+  .description('Disconnect from a provider')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (provider, options) => {
+    await disconnectCommand(provider, options);
+  });
+
+program
+  .command('sync <provider>')
+  .description('Sync secrets with a provider (e.g., vercel)')
+  .option('--pull', 'Import secrets from provider to Keyway')
+  .option('-e, --environment <env>', 'Keyway environment', 'production')
+  .option('--provider-env <env>', 'Provider environment', 'production')
+  .option('--project <project>', 'Provider project name or ID')
+  .option('--allow-delete', 'Allow deleting secrets not in source')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
+  .action(async (provider, options) => {
+    await syncCommand(provider, options);
   });
 
 program.parseAsync().catch((error) => {

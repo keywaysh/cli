@@ -92,10 +92,9 @@ export async function initCommand(options: InitOptions = {}) {
         console.log('');
         console.log(chalk.dim('─'.repeat(50)));
         console.log('');
-        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade to Pro')}`);
+        console.log(`  ${chalk.yellow('⚡')} ${chalk.bold('Upgrade Required')}`);
         console.log('');
-        console.log(chalk.gray('  You\'ve reached the limit of your free plan.'));
-        console.log(chalk.gray('  Upgrade to Pro for unlimited private repositories.'));
+        console.log(chalk.gray(`  ${error.message}`));
         console.log('');
         console.log(`  ${chalk.cyan('→')} ${chalk.underline(error.upgradeUrl || 'https://keyway.sh/upgrade')}`);
         console.log('');
