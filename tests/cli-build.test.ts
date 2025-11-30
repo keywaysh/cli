@@ -35,7 +35,7 @@ describe('CLI Build', () => {
       cwd: rootDir,
     });
     expect(result).toContain('keyway');
-    expect(result).toContain('GitHub-native secrets manager');
+    expect(result).toContain('Sync secrets with your team and infra');
   });
 
   it('should show banner without crashing (picocolors compatibility)', () => {

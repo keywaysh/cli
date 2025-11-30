@@ -12,18 +12,18 @@ import { syncCommand } from './cmds/sync.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
+const TAGLINE = 'Sync secrets with your team and infra';
 
 const showBanner = () => {
   const text = pc.bold(pc.cyan('Keyway CLI'));
-  const subtitle = pc.gray('GitHub-native secrets manager for dev teams');
-  console.log(`\n${text}\n${subtitle}\n`);
+  console.log(`\n${text}\n${pc.gray(TAGLINE)}\n`);
 };
 
 showBanner();
 
 program
   .name('keyway')
-  .description('GitHub-native secrets manager for dev teams')
+  .description(TAGLINE)
   .version(packageJson.version);
 
 program
