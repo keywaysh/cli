@@ -11,11 +11,21 @@ import {
 import { ensureLogin } from './login.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
+import {
+  buildSyncPlan,
+  printSyncPlan,
+  confirmSync,
+  handleFirstSync,
+  printSyncResult,
+  printAlreadyInSync,
+  resolveEnvironmentMapping,
+  type SyncDirection,
+} from '../utils/sync-helpers.js';
 
 interface SyncOptions {
   pull?: boolean;
-  environment?: string;
-  providerEnv?: string;
+  env?: string;         // Changed from 'environment'
+  environment?: string; // Keep for backwards compatibility
   project?: string;
   allowDelete?: boolean;
   yes?: boolean;
@@ -141,6 +151,107 @@ async function promptProjectSelection(
 }
 
 /**
+ * Select project with auto-detection and warnings
+ */
+async function selectProject(
+  projects: ProjectWithLinkedRepo[],
+  repoFullName: string,
+  specifiedProject?: string
+): Promise<ProjectWithLinkedRepo> {
+  if (specifiedProject) {
+    // Use specified project
+    const found = projects.find(p =>
+      p.id === specifiedProject || p.name.toLowerCase() === specifiedProject.toLowerCase()
+    );
+    if (!found) {
+      console.error(pc.red(`Project not found: ${specifiedProject}`));
+      console.log(pc.gray('Available projects:'));
+      projects.forEach(p => console.log(pc.gray(`  - ${p.name}`)));
+      process.exit(1);
+    }
+
+    // Warn if manually specified project doesn't match repo
+    if (!projectMatchesRepo(found, repoFullName)) {
+      console.log('');
+      console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
+      console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
+      console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
+      console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
+      console.log(pc.yellow(`  Selected project:  ${found.name}`));
+      if (found.linkedRepo) {
+        console.log(pc.yellow(`  Project linked to: ${found.linkedRepo}`));
+      }
+      console.log('');
+    }
+
+    return found;
+  }
+
+  // Auto-detect or prompt
+  const autoMatch = findMatchingProject(projects, repoFullName);
+
+  if (autoMatch && (autoMatch.matchType === 'linked_repo' || autoMatch.matchType === 'exact_name')) {
+    // Auto-select for strong matches (linked repo or exact name)
+    const matchReason = autoMatch.matchType === 'linked_repo'
+      ? `linked to ${repoFullName}`
+      : 'exact name match';
+    console.log(pc.green(`✓ Auto-selected project: ${autoMatch.project.name} (${matchReason})`));
+    return autoMatch.project;
+  }
+
+  if (autoMatch && autoMatch.matchType === 'partial_name') {
+    // Partial match - ask for confirmation
+    console.log(pc.yellow(`Detected project: ${autoMatch.project.name} (partial match)`));
+    const { useDetected } = await prompts({
+      type: 'confirm',
+      name: 'useDetected',
+      message: `Use ${autoMatch.project.name}?`,
+      initial: true,
+    });
+
+    if (useDetected) {
+      return autoMatch.project;
+    }
+    return promptProjectSelection(projects, repoFullName);
+  }
+
+  if (projects.length === 1) {
+    // Only one project - use it but warn if it doesn't match
+    const project = projects[0];
+    if (!projectMatchesRepo(project, repoFullName)) {
+      console.log('');
+      console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
+      console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
+      console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
+      console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
+      console.log(pc.yellow(`  Only project:      ${project.name}`));
+      if (project.linkedRepo) {
+        console.log(pc.yellow(`  Project linked to: ${project.linkedRepo}`));
+      }
+      console.log('');
+
+      const { continueAnyway } = await prompts({
+        type: 'confirm',
+        name: 'continueAnyway',
+        message: 'Continue anyway?',
+        initial: false,
+      });
+
+      if (!continueAnyway) {
+        console.log(pc.gray('Cancelled.'));
+        process.exit(0);
+      }
+    }
+    return project;
+  }
+
+  // No match found - show list with warning
+  console.log(pc.yellow(`\n⚠️  No matching project found for ${repoFullName}`));
+  console.log(pc.gray('Select a project manually:\n'));
+  return promptProjectSelection(projects, repoFullName);
+}
+
+/**
  * Sync secrets with a provider (Vercel, etc.)
  */
 export async function syncCommand(provider: string, options: SyncOptions = {}) {
@@ -152,9 +263,9 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       process.exit(1);
     }
 
+    // 1. Auth + repo detection
     const accessToken = await ensureLogin({ allowPrompt: options.loginPrompt !== false });
 
-    // Detect current repo
     const repoFullName = detectGitRepo();
     if (!repoFullName) {
       console.error(pc.red('Could not detect Git repository.'));
@@ -164,7 +275,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
 
     console.log(pc.gray(`Repository: ${repoFullName}`));
 
-    // Get provider connection
+    // 2. Provider connection
     const { connections } = await getConnections(accessToken);
     const connection = connections.find(c => c.provider === provider.toLowerCase());
 
@@ -174,7 +285,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       process.exit(1);
     }
 
-    // Get provider projects
+    // 3. Get projects and select one
     const { projects } = await getConnectionProjects(accessToken, connection.id);
 
     if (projects.length === 0) {
@@ -182,136 +293,18 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       process.exit(1);
     }
 
-    // Select project
-    let selectedProject: ProjectWithLinkedRepo;
+    const selectedProject = await selectProject(projects, repoFullName, options.project);
 
-    if (options.project) {
-      // Use specified project
-      const found = projects.find(p =>
-        p.id === options.project || p.name.toLowerCase() === options.project?.toLowerCase()
-      );
-      if (!found) {
-        console.error(pc.red(`Project not found: ${options.project}`));
-        console.log(pc.gray('Available projects:'));
-        projects.forEach(p => console.log(pc.gray(`  - ${p.name}`)));
-        process.exit(1);
-      }
-      selectedProject = found;
+    // 4. Environment mapping
+    const keywayEnv = options.env || options.environment || 'production';
+    const providerEnv = await resolveEnvironmentMapping(keywayEnv, provider, options.yes);
 
-      // Warn if manually specified project doesn't match repo
-      if (!projectMatchesRepo(selectedProject, repoFullName)) {
-        console.log('');
-        console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
-        console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
-        console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
-        console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
-        if (selectedProject.linkedRepo) {
-          console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
-        }
-        console.log('');
-      }
-    } else {
-      // Auto-detect or prompt
-      const autoMatch = findMatchingProject(projects, repoFullName);
-
-      if (autoMatch && (autoMatch.matchType === 'linked_repo' || autoMatch.matchType === 'exact_name')) {
-        // Auto-select for strong matches (linked repo or exact name)
-        selectedProject = autoMatch.project;
-        const matchReason = autoMatch.matchType === 'linked_repo'
-          ? `linked to ${repoFullName}`
-          : 'exact name match';
-        console.log(pc.green(`✓ Auto-selected project: ${selectedProject.name} (${matchReason})`));
-      } else if (autoMatch && autoMatch.matchType === 'partial_name') {
-        // Partial match - ask for confirmation
-        console.log(pc.yellow(`Detected project: ${autoMatch.project.name} (partial match)`));
-        const { useDetected } = await prompts({
-          type: 'confirm',
-          name: 'useDetected',
-          message: `Use ${autoMatch.project.name}?`,
-          initial: true,
-        });
-
-        if (useDetected) {
-          selectedProject = autoMatch.project;
-        } else {
-          selectedProject = await promptProjectSelection(projects, repoFullName);
-        }
-      } else if (projects.length === 1) {
-        // Only one project - use it but warn if it doesn't match
-        selectedProject = projects[0];
-        if (!projectMatchesRepo(selectedProject, repoFullName)) {
-          console.log('');
-          console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
-          console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
-          console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
-          console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-          console.log(pc.yellow(`  Only project:      ${selectedProject.name}`));
-          if (selectedProject.linkedRepo) {
-            console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
-          }
-          console.log('');
-
-          const { continueAnyway } = await prompts({
-            type: 'confirm',
-            name: 'continueAnyway',
-            message: 'Continue anyway?',
-            initial: false,
-          });
-
-          if (!continueAnyway) {
-            console.log(pc.gray('Cancelled.'));
-            process.exit(0);
-          }
-        }
-      } else {
-        // No match found - show list with warning
-        console.log(pc.yellow(`\n⚠️  No matching project found for ${repoFullName}`));
-        console.log(pc.gray('Select a project manually:\n'));
-        selectedProject = await promptProjectSelection(projects, repoFullName);
-      }
+    if (!providerEnv) {
+      console.log(pc.gray('Cancelled.'));
+      process.exit(0);
     }
 
-    // Final warning if selected project doesn't match repo (from manual selection)
-    if (!options.project && !projectMatchesRepo(selectedProject, repoFullName)) {
-      const autoMatch = findMatchingProject(projects, repoFullName);
-      // Only show warning if we didn't already show one (i.e., user manually selected from list)
-      if (autoMatch && autoMatch.project.id !== selectedProject.id) {
-        console.log('');
-        console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
-        console.log(pc.yellow('│  ⚠️  WARNING: You selected a different project              │'));
-        console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
-        console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
-        if (selectedProject.linkedRepo) {
-          console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
-        }
-        console.log('');
-
-        const { continueAnyway } = await prompts({
-          type: 'confirm',
-          name: 'continueAnyway',
-          message: 'Are you sure you want to sync with this project?',
-          initial: false,
-        });
-
-        if (!continueAnyway) {
-          console.log(pc.gray('Cancelled.'));
-          process.exit(0);
-        }
-      }
-    }
-
-    const keywayEnv = options.environment || 'production';
-    const providerEnv = options.providerEnv || 'production';
-    const direction = options.pull ? 'pull' : 'push';
-    const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
-
-    console.log(pc.gray(`Project: ${selectedProject.name}`));
-    console.log(pc.gray(`Environment: ${keywayEnv}${providerEnv !== keywayEnv ? ` → ${providerEnv}` : ''}`));
-    console.log(pc.gray(`Direction: ${direction === 'push' ? 'Keyway → ' + providerName : providerName + ' → Keyway'}`));
-
-    // First-time detection
+    // 5. Get sync status for first-time detection
     const status = await getSyncStatus(
       accessToken,
       repoFullName,
@@ -320,48 +313,92 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       keywayEnv
     );
 
+    // 6. Determine direction (handle first-time sync)
+    let direction: SyncDirection = options.pull ? 'pull' : 'push';
+
     if (status.isFirstSync && !options.pull && status.vaultIsEmpty && status.providerHasSecrets) {
-      console.log(pc.yellow(`\n⚠️  Your Keyway vault is empty for "${keywayEnv}", but ${providerName} has ${status.providerSecretCount} secrets.`));
-      console.log(pc.gray(`   (Use --environment to sync a different environment)`));
-
-      const { importFirst } = await prompts({
-        type: 'confirm',
-        name: 'importFirst',
-        message: `Import secrets from ${providerName} first?`,
-        initial: true,
-      });
-
-      if (importFirst) {
-        // Switch to pull mode
-        await executeSyncOperation(
-          accessToken,
-          repoFullName,
-          connection.id,
-          selectedProject,
-          keywayEnv,
-          providerEnv,
-          'pull',
-          false, // Never delete on import
-          options.yes || false,
-          provider
-        );
-        return;
+      const choice = await handleFirstSync(status.providerSecretCount, provider);
+      if (choice.cancelled) {
+        console.log(pc.gray('Cancelled.'));
+        process.exit(0);
       }
+      direction = choice.direction;
     }
 
-    // Execute sync
-    await executeSyncOperation(
-      accessToken,
+    // 7. Get preview
+    const preview = await getSyncPreview(accessToken, repoFullName, {
+      connectionId: connection.id,
+      projectId: selectedProject.id,
+      keywayEnvironment: keywayEnv,
+      providerEnvironment: providerEnv,
+      direction,
+      allowDelete: options.allowDelete || false,
+    });
+
+    const totalChanges = preview.toCreate.length + preview.toUpdate.length + preview.toDelete.length;
+
+    if (totalChanges === 0) {
+      printAlreadyInSync();
+      return;
+    }
+
+    // 8. Build and print sync plan
+    const vaultSecretCount = direction === 'push'
+      ? preview.toCreate.length + preview.toUpdate.length + preview.toSkip.length
+      : status.providerSecretCount - preview.toCreate.length;
+
+    const plan = buildSyncPlan({
       repoFullName,
-      connection.id,
-      selectedProject,
+      projectName: selectedProject.name,
+      provider,
+      direction,
       keywayEnv,
       providerEnv,
+      vaultSecretCount: direction === 'push' ? vaultSecretCount : (status.vaultIsEmpty ? 0 : vaultSecretCount),
+      providerSecretCount: status.providerSecretCount,
+      changes: preview,
+      isFirstSync: status.isFirstSync,
+    });
+
+    printSyncPlan(plan);
+
+    // 9. Confirm
+    if (!await confirmSync(plan, options.yes || false)) {
+      console.log(pc.gray('Cancelled.'));
+      return;
+    }
+
+    // 10. Execute sync
+    console.log(pc.cyan('⏳ Syncing...'));
+
+    const result = await executeSync(accessToken, repoFullName, {
+      connectionId: connection.id,
+      projectId: selectedProject.id,
+      keywayEnvironment: keywayEnv,
+      providerEnvironment: providerEnv,
       direction,
-      options.allowDelete || false,
-      options.yes || false,
-      provider
-    );
+      allowDelete: options.allowDelete || false,
+    });
+
+    if (result.success) {
+      printSyncResult({
+        success: true,
+        created: result.stats.created,
+        updated: result.stats.updated,
+        deleted: result.stats.deleted,
+      });
+
+      trackEvent(AnalyticsEvents.CLI_SYNC, {
+        provider,
+        direction,
+        created: result.stats.created,
+        updated: result.stats.updated,
+        deleted: result.stats.deleted,
+      });
+    } else {
+      console.error(pc.red(`\n✗ ${result.error}`));
+      process.exit(1);
+    }
 
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Sync failed';
@@ -370,119 +407,6 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       error: truncateMessage(message),
     });
     console.error(pc.red(`\n✗ ${message}`));
-    process.exit(1);
-  }
-}
-
-async function executeSyncOperation(
-  accessToken: string,
-  repoFullName: string,
-  connectionId: string,
-  project: { id: string; name: string },
-  keywayEnv: string,
-  providerEnv: string,
-  direction: 'push' | 'pull',
-  allowDelete: boolean,
-  skipConfirm: boolean,
-  provider: string
-) {
-  const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
-
-  // Get preview
-  const preview = await getSyncPreview(accessToken, repoFullName, {
-    connectionId,
-    projectId: project.id,
-    keywayEnvironment: keywayEnv,
-    providerEnvironment: providerEnv,
-    direction,
-    allowDelete,
-  });
-
-  const totalChanges = preview.toCreate.length + preview.toUpdate.length + preview.toDelete.length;
-
-  if (totalChanges === 0) {
-    console.log(pc.green('\n✓ Already in sync. No changes needed.'));
-    return;
-  }
-
-  // Show preview
-  console.log(pc.blue('\n📋 Sync Preview\n'));
-
-  if (preview.toCreate.length > 0) {
-    console.log(pc.green(`  + ${preview.toCreate.length} to create`));
-    preview.toCreate.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
-    if (preview.toCreate.length > 5) {
-      console.log(pc.gray(`    ... and ${preview.toCreate.length - 5} more`));
-    }
-  }
-
-  if (preview.toUpdate.length > 0) {
-    console.log(pc.yellow(`  ~ ${preview.toUpdate.length} to update`));
-    preview.toUpdate.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
-    if (preview.toUpdate.length > 5) {
-      console.log(pc.gray(`    ... and ${preview.toUpdate.length - 5} more`));
-    }
-  }
-
-  if (preview.toDelete.length > 0) {
-    console.log(pc.red(`  - ${preview.toDelete.length} to delete`));
-    preview.toDelete.slice(0, 5).forEach(key => console.log(pc.gray(`    ${key}`)));
-    if (preview.toDelete.length > 5) {
-      console.log(pc.gray(`    ... and ${preview.toDelete.length - 5} more`));
-    }
-  }
-
-  if (preview.toSkip.length > 0) {
-    console.log(pc.gray(`  ○ ${preview.toSkip.length} unchanged`));
-  }
-
-  console.log('');
-
-  // Confirm
-  if (!skipConfirm) {
-    const target = direction === 'push' ? providerName : 'Keyway';
-    const { confirm } = await prompts({
-      type: 'confirm',
-      name: 'confirm',
-      message: `Apply ${totalChanges} changes to ${target}?`,
-      initial: true,
-    });
-
-    if (!confirm) {
-      console.log(pc.gray('Cancelled.'));
-      return;
-    }
-  }
-
-  // Execute
-  console.log(pc.blue('\n⏳ Syncing...\n'));
-
-  const result = await executeSync(accessToken, repoFullName, {
-    connectionId,
-    projectId: project.id,
-    keywayEnvironment: keywayEnv,
-    providerEnvironment: providerEnv,
-    direction,
-    allowDelete,
-  });
-
-  if (result.success) {
-    console.log(pc.green('✓ Sync complete'));
-    console.log(pc.gray(`  Created: ${result.stats.created}`));
-    console.log(pc.gray(`  Updated: ${result.stats.updated}`));
-    if (result.stats.deleted > 0) {
-      console.log(pc.gray(`  Deleted: ${result.stats.deleted}`));
-    }
-
-    trackEvent(AnalyticsEvents.CLI_SYNC, {
-      provider,
-      direction,
-      created: result.stats.created,
-      updated: result.stats.updated,
-      deleted: result.stats.deleted,
-    });
-  } else {
-    console.error(pc.red(`\n✗ ${result.error}`));
     process.exit(1);
   }
 }

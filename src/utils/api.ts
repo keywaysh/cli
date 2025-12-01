@@ -504,3 +504,55 @@ export async function executeSync(
 
   return handleResponse<SyncResult>(response);
 }
+
+// ==================== GitHub App Installation ====================
+
+export interface InstallationCheckResult {
+  installed: boolean;
+  installUrl: string;
+  hasAccess?: boolean;
+  permission?: string;
+  message?: string;
+}
+
+/**
+ * Check if GitHub App is installed on a repository
+ */
+export async function checkInstallation(
+  accessToken: string,
+  repoFullName: string
+): Promise<InstallationCheckResult> {
+  const params = new URLSearchParams({ repo: repoFullName });
+
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/installations/check?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  return handleResponse<InstallationCheckResult>(response);
+}
+
+/**
+ * Get GitHub App installation URL
+ */
+export async function getInstallationUrl(repoFullName?: string): Promise<{ installUrl: string; appName: string }> {
+  const params = repoFullName ? new URLSearchParams({ repo: repoFullName }) : '';
+
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/installations/url${params ? `?${params}` : ''}`,
+    {
+      method: 'GET',
+      headers: {
+        'User-Agent': USER_AGENT,
+      },
+    }
+  );
+
+  return handleResponse<{ installUrl: string; appName: string }>(response);
+}
