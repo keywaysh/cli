@@ -130,4 +130,5 @@ export const AnalyticsEvents = {
   CLI_CONNECT: 'cli_connect',
   CLI_DISCONNECT: 'cli_disconnect',
   CLI_SYNC: 'cli_sync',
+  CLI_FEEDBACK: 'cli_feedback',
 } as const;

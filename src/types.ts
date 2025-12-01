@@ -82,6 +82,7 @@ export interface ProviderProject {
   id: string;
   name: string;
   framework?: string;
+  linkedRepo?: string; // GitHub repo linked to this project (e.g., "owner/repo")
 }
 
 export interface SyncStatusInfo {

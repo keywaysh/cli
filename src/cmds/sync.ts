@@ -22,29 +22,122 @@ interface SyncOptions {
   loginPrompt?: boolean;
 }
 
+export interface ProjectWithLinkedRepo {
+  id: string;
+  name: string;
+  linkedRepo?: string;
+}
+
+export interface ProjectMatch {
+  project: ProjectWithLinkedRepo;
+  matchType: 'linked_repo' | 'exact_name' | 'partial_name';
+}
+
 /**
- * Find matching Vercel project based on Git repo name
- * Uses strict matching to prevent syncing to wrong project
+ * Find matching provider project based on Git repo
+ * Priority: 1) linkedRepo exact match, 2) exact name match, 3) partial name match
  */
-function findMatchingProject(
-  projects: Array<{ id: string; name: string }>,
+export function findMatchingProject(
+  projects: ProjectWithLinkedRepo[],
   repoFullName: string
-): { id: string; name: string } | undefined {
+): ProjectMatch | undefined {
+  const repoFullNameLower = repoFullName.toLowerCase();
   const repoName = repoFullName.split('/')[1]?.toLowerCase();
   if (!repoName) return undefined;
 
-  // Exact match first (most reliable)
-  const exact = projects.find(p => p.name.toLowerCase() === repoName);
-  if (exact) return exact;
+  // Priority 1: Exact linkedRepo match (most reliable - the project is linked to this repo)
+  const linkedMatch = projects.find(p =>
+    p.linkedRepo?.toLowerCase() === repoFullNameLower
+  );
+  if (linkedMatch) {
+    return { project: linkedMatch, matchType: 'linked_repo' };
+  }
 
-  // Partial match: only if UNIQUE result to avoid false positives
-  const partial = projects.filter(p =>
+  // Priority 2: Exact name match
+  const exactNameMatch = projects.find(p => p.name.toLowerCase() === repoName);
+  if (exactNameMatch) {
+    return { project: exactNameMatch, matchType: 'exact_name' };
+  }
+
+  // Priority 3: Partial match - only if UNIQUE result to avoid false positives
+  const partialMatches = projects.filter(p =>
     p.name.toLowerCase().includes(repoName) ||
     repoName.includes(p.name.toLowerCase())
   );
 
-  // Only return if exactly one match to avoid syncing to wrong project
-  return partial.length === 1 ? partial[0] : undefined;
+  if (partialMatches.length === 1) {
+    return { project: partialMatches[0], matchType: 'partial_name' };
+  }
+
+  return undefined;
+}
+
+/**
+ * Check if a project matches the current repo
+ */
+export function projectMatchesRepo(
+  project: ProjectWithLinkedRepo,
+  repoFullName: string
+): boolean {
+  const repoFullNameLower = repoFullName.toLowerCase();
+  const repoName = repoFullName.split('/')[1]?.toLowerCase();
+
+  // linkedRepo match
+  if (project.linkedRepo?.toLowerCase() === repoFullNameLower) {
+    return true;
+  }
+
+  // Exact name match
+  if (repoName && project.name.toLowerCase() === repoName) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Prompt user to select a project from list
+ */
+async function promptProjectSelection(
+  projects: ProjectWithLinkedRepo[],
+  repoFullName: string
+): Promise<ProjectWithLinkedRepo> {
+  const repoName = repoFullName.split('/')[1]?.toLowerCase() || '';
+
+  // Build choices with helpful labels
+  const choices = projects.map(p => {
+    let title = p.name;
+    const badges: string[] = [];
+
+    // Add badges for matching projects
+    if (p.linkedRepo?.toLowerCase() === repoFullName.toLowerCase()) {
+      badges.push(pc.green('← linked'));
+    } else if (p.name.toLowerCase() === repoName) {
+      badges.push(pc.green('← same name'));
+    } else if (p.linkedRepo) {
+      badges.push(pc.gray(`→ ${p.linkedRepo}`));
+    }
+
+    if (badges.length > 0) {
+      title = `${p.name} ${badges.join(' ')}`;
+    }
+
+    return { title, value: p.id };
+  });
+
+  const { projectChoice } = await prompts({
+    type: 'select',
+    name: 'projectChoice',
+    message: 'Select a project:',
+    choices,
+  });
+
+  if (!projectChoice) {
+    console.log(pc.gray('Cancelled.'));
+    process.exit(0);
+  }
+
+  return projects.find(p => p.id === projectChoice)!;
 }
 
 /**
@@ -90,7 +183,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     }
 
     // Select project
-    let selectedProject: { id: string; name: string };
+    let selectedProject: ProjectWithLinkedRepo;
 
     if (options.project) {
       // Use specified project
@@ -104,48 +197,108 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         process.exit(1);
       }
       selectedProject = found;
+
+      // Warn if manually specified project doesn't match repo
+      if (!projectMatchesRepo(selectedProject, repoFullName)) {
+        console.log('');
+        console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
+        console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
+        console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
+        console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
+        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
+        if (selectedProject.linkedRepo) {
+          console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
+        }
+        console.log('');
+      }
     } else {
       // Auto-detect or prompt
       const autoMatch = findMatchingProject(projects, repoFullName);
 
-      if (autoMatch && projects.length > 1) {
-        console.log(pc.gray(`Detected project: ${autoMatch.name}`));
+      if (autoMatch && (autoMatch.matchType === 'linked_repo' || autoMatch.matchType === 'exact_name')) {
+        // Auto-select for strong matches (linked repo or exact name)
+        selectedProject = autoMatch.project;
+        const matchReason = autoMatch.matchType === 'linked_repo'
+          ? `linked to ${repoFullName}`
+          : 'exact name match';
+        console.log(pc.green(`✓ Auto-selected project: ${selectedProject.name} (${matchReason})`));
+      } else if (autoMatch && autoMatch.matchType === 'partial_name') {
+        // Partial match - ask for confirmation
+        console.log(pc.yellow(`Detected project: ${autoMatch.project.name} (partial match)`));
         const { useDetected } = await prompts({
           type: 'confirm',
           name: 'useDetected',
-          message: `Use ${autoMatch.name}?`,
+          message: `Use ${autoMatch.project.name}?`,
           initial: true,
         });
 
         if (useDetected) {
-          selectedProject = autoMatch;
+          selectedProject = autoMatch.project;
         } else {
-          const { projectChoice } = await prompts({
-            type: 'select',
-            name: 'projectChoice',
-            message: 'Select a project:',
-            choices: projects.map(p => ({ title: p.name, value: p.id })),
-          });
-          selectedProject = projects.find(p => p.id === projectChoice)!;
+          selectedProject = await promptProjectSelection(projects, repoFullName);
         }
-      } else if (autoMatch) {
-        selectedProject = autoMatch;
       } else if (projects.length === 1) {
+        // Only one project - use it but warn if it doesn't match
         selectedProject = projects[0];
+        if (!projectMatchesRepo(selectedProject, repoFullName)) {
+          console.log('');
+          console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
+          console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
+          console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
+          console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
+          console.log(pc.yellow(`  Only project:      ${selectedProject.name}`));
+          if (selectedProject.linkedRepo) {
+            console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
+          }
+          console.log('');
+
+          const { continueAnyway } = await prompts({
+            type: 'confirm',
+            name: 'continueAnyway',
+            message: 'Continue anyway?',
+            initial: false,
+          });
+
+          if (!continueAnyway) {
+            console.log(pc.gray('Cancelled.'));
+            process.exit(0);
+          }
+        }
       } else {
-        const { projectChoice } = await prompts({
-          type: 'select',
-          name: 'projectChoice',
-          message: 'Select a project:',
-          choices: projects.map(p => ({ title: p.name, value: p.id })),
+        // No match found - show list with warning
+        console.log(pc.yellow(`\n⚠️  No matching project found for ${repoFullName}`));
+        console.log(pc.gray('Select a project manually:\n'));
+        selectedProject = await promptProjectSelection(projects, repoFullName);
+      }
+    }
+
+    // Final warning if selected project doesn't match repo (from manual selection)
+    if (!options.project && !projectMatchesRepo(selectedProject, repoFullName)) {
+      const autoMatch = findMatchingProject(projects, repoFullName);
+      // Only show warning if we didn't already show one (i.e., user manually selected from list)
+      if (autoMatch && autoMatch.project.id !== selectedProject.id) {
+        console.log('');
+        console.log(pc.yellow('┌─────────────────────────────────────────────────────────────┐'));
+        console.log(pc.yellow('│  ⚠️  WARNING: You selected a different project              │'));
+        console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
+        console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
+        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
+        if (selectedProject.linkedRepo) {
+          console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
+        }
+        console.log('');
+
+        const { continueAnyway } = await prompts({
+          type: 'confirm',
+          name: 'continueAnyway',
+          message: 'Are you sure you want to sync with this project?',
+          initial: false,
         });
 
-        if (!projectChoice) {
+        if (!continueAnyway) {
           console.log(pc.gray('Cancelled.'));
           process.exit(0);
         }
-
-        selectedProject = projects.find(p => p.id === projectChoice)!;
       }
     }
 
