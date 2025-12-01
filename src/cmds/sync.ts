@@ -308,6 +308,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
 
     console.log(pc.gray(`Project: ${selectedProject.name}`));
+    console.log(pc.gray(`Environment: ${keywayEnv}${providerEnv !== keywayEnv ? ` → ${providerEnv}` : ''}`));
     console.log(pc.gray(`Direction: ${direction === 'push' ? 'Keyway → ' + providerName : providerName + ' → Keyway'}`));
 
     // First-time detection
@@ -320,7 +321,8 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     );
 
     if (status.isFirstSync && !options.pull && status.vaultIsEmpty && status.providerHasSecrets) {
-      console.log(pc.yellow(`\n⚠️  Your Keyway vault is empty, but ${providerName} has ${status.providerSecretCount} secrets.`));
+      console.log(pc.yellow(`\n⚠️  Your Keyway vault is empty for "${keywayEnv}", but ${providerName} has ${status.providerSecretCount} secrets.`));
+      console.log(pc.gray(`   (Use --environment to sync a different environment)`));
 
       const { importFirst } = await prompts({
         type: 'confirm',
