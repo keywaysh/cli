@@ -4,7 +4,6 @@ import type {
   PushSecretsRequest,
   PushSecretsResponse,
   PullSecretsResponse,
-  ErrorResponse,
   DeviceStartResponse,
   DevicePollResponse,
   ValidateTokenResponse,

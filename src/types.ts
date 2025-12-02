@@ -32,13 +32,6 @@ export interface PullSecretsResponse {
   content: string;
 }
 
-export interface ErrorResponse {
-  error: string;
-  message: string;
-  statusCode?: number;
-  upgrade_url?: string;
-}
-
 // Auth / login flows
 export interface DeviceStartResponse {
   deviceCode: string;
