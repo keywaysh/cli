@@ -120,6 +120,38 @@ export async function shutdownAnalytics() {
   }
 }
 
+/**
+ * Identify a user in PostHog for analytics
+ */
+export function identifyUser(userId: string, properties?: Record<string, any>) {
+  try {
+    if (TELEMETRY_DISABLED) return;
+    if (!posthog) initPostHog();
+    if (!posthog) return;
+
+    const sanitizedProperties = properties ? sanitizeProperties(properties) : {};
+
+    posthog.identify({
+      distinctId: userId,
+      properties: {
+        ...sanitizedProperties,
+        source: 'cli',
+      },
+    });
+
+    // Also alias the anonymous ID to this user
+    const anonId = getDistinctId();
+    if (anonId && anonId !== userId) {
+      posthog.alias({
+        distinctId: userId,
+        alias: anonId,
+      });
+    }
+  } catch (error) {
+    console.debug('Analytics identify error:', error);
+  }
+}
+
 export const AnalyticsEvents = {
   CLI_INIT: 'cli_init',
   CLI_PUSH: 'cli_push',

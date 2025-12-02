@@ -5,7 +5,7 @@ import prompts from 'prompts';
 import { pollDeviceLogin, startDeviceLogin, validateToken, truncateMessage } from '../utils/api.js';
 import { clearAuth, getAuthFilePath, getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { detectGitRepo } from '../utils/git.js';
-import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
+import { trackEvent, identifyUser, AnalyticsEvents } from '../utils/analytics.js';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -80,6 +80,14 @@ export async function runLoginFlow(): Promise<string> {
         method: 'device',
         repo: repoName,
       });
+
+      // Link analytics to the authenticated user
+      if (result.githubLogin) {
+        identifyUser(result.githubLogin, {
+          github_username: result.githubLogin,
+          login_method: 'device',
+        });
+      }
 
       console.log(pc.green('\n✓ Login successful'));
       if (result.githubLogin) {
@@ -179,6 +187,12 @@ async function runTokenLogin(): Promise<string> {
   trackEvent(AnalyticsEvents.CLI_LOGIN, {
     method: 'pat',
     repo: repoName,
+  });
+
+  // Link analytics to the authenticated user
+  identifyUser(validation.username, {
+    github_username: validation.username,
+    login_method: 'pat',
   });
 
   console.log(pc.green('✅ Authenticated'), `as ${pc.cyan(`@${validation.username}`)}`);
