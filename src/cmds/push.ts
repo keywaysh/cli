@@ -258,6 +258,12 @@ export async function pushCommand(options: PushOptions) {
                `Use ${pc.cyan(`keyway push --env <environment>`)} to specify one, ` +
                `or create '${requestedEnv}' via the dashboard.`;
       }
+
+      // Detect plan limit error (read-only vault on Free plan)
+      if (error.statusCode === 403 && message.toLowerCase().includes('read-only')) {
+        message = 'This vault is read-only on your current plan.';
+        hint = `Upgrade to Pro to unlock editing: ${pc.cyan(error.upgradeUrl || 'https://keyway.sh/settings')}`;
+      }
     } else if (error instanceof Error) {
       message = truncateMessage(error.message);
     } else {
