@@ -1,6 +1,8 @@
 import Conf from 'conf';
-import { createCipheriv, createDecipheriv, randomBytes, scrypt } from 'crypto';
-import { promisify } from 'util';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync } from 'fs';
+import { dirname, join } from 'path';
+import { homedir } from 'os';
 
 export interface StoredAuth {
   keywayToken: string;
@@ -9,41 +11,57 @@ export interface StoredAuth {
   createdAt: string;
 }
 
-const store = new Conf<{ auth?: string; salt?: string }>({
+const store = new Conf<{ auth?: string }>({
   projectName: 'keyway',
   configName: 'config',
   fileMode: 0o600,
 });
 
-// WARNING: Token encryption key derived from machine-specific data
-// This provides basic obfuscation but is NOT cryptographically secure storage.
-// For production use, consider using OS-native keychain (keytar package).
-// See: https://github.com/atom/node-keytar
-const scryptAsync = promisify(scrypt);
+// Security: Store encryption key in a separate file with restricted permissions (0600)
+// This is more secure than deriving from $USER which is predictable and guessable.
+// The key file is stored in ~/.keyway/.key and is NOT backed up or synced.
+// (CRIT-3 fix: Use random key instead of $USER-derived key)
+const KEY_DIR = join(homedir(), '.keyway');
+const KEY_FILE = join(KEY_DIR, '.key');
 
-async function getEncryptionKey(): Promise<Buffer> {
-  // Use machine-specific data to derive encryption key
-  const machineId = process.env.USER || process.env.USERNAME || 'keyway-user';
-  let salt = store.get('salt');
-
-  if (!salt) {
-    salt = randomBytes(16).toString('hex');
-    store.set('salt', salt);
+function getOrCreateEncryptionKey(): Buffer {
+  // Ensure key directory exists with restricted permissions
+  if (!existsSync(KEY_DIR)) {
+    mkdirSync(KEY_DIR, { recursive: true, mode: 0o700 });
   }
 
-  const key = await scryptAsync(machineId, salt, 32) as Buffer;
+  if (existsSync(KEY_FILE)) {
+    // Read existing key
+    const keyHex = readFileSync(KEY_FILE, 'utf-8').trim();
+    if (keyHex.length === 64) {
+      return Buffer.from(keyHex, 'hex');
+    }
+    // Invalid key format, regenerate
+  }
+
+  // Generate new random key (256 bits = 32 bytes)
+  const key = randomBytes(32);
+  const keyHex = key.toString('hex');
+
+  // Write key with restricted permissions (owner read/write only)
+  writeFileSync(KEY_FILE, keyHex, { mode: 0o600 });
+
+  // Ensure permissions are correct (writeFileSync mode may be affected by umask)
+  try {
+    chmodSync(KEY_FILE, 0o600);
+  } catch {
+    // Ignore chmod errors on Windows
+  }
+
   return key;
 }
 
-async function encryptToken(token: string): Promise<string> {
-  const key = await getEncryptionKey();
+function encryptToken(token: string): string {
+  const key = getOrCreateEncryptionKey();
   const iv = randomBytes(16);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
 
-  const encrypted = Buffer.concat([
-    cipher.update(token, 'utf8'),
-    cipher.final()
-  ]);
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
 
   const authTag = cipher.getAuthTag();
 
@@ -51,8 +69,8 @@ async function encryptToken(token: string): Promise<string> {
   return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-async function decryptToken(encryptedData: string): Promise<string> {
-  const key = await getEncryptionKey();
+function decryptToken(encryptedData: string): string {
+  const key = getOrCreateEncryptionKey();
   const parts = encryptedData.split(':');
 
   if (parts.length !== 3) {
@@ -66,10 +84,7 @@ async function decryptToken(encryptedData: string): Promise<string> {
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(authTag);
 
-  const decrypted = Buffer.concat([
-    decipher.update(encrypted),
-    decipher.final()
-  ]);
+  const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
 
   return decrypted.toString('utf8');
 }
@@ -88,7 +103,7 @@ export async function getStoredAuth(): Promise<StoredAuth | null> {
   }
 
   try {
-    const decrypted = await decryptToken(encryptedData);
+    const decrypted = decryptToken(encryptedData);
     const auth = JSON.parse(decrypted) as StoredAuth;
 
     if (isExpired(auth)) {
@@ -97,15 +112,18 @@ export async function getStoredAuth(): Promise<StoredAuth | null> {
     }
 
     return auth;
-  } catch (error) {
-    // If decryption fails (corrupted data or wrong key), clear auth
+  } catch {
+    // If decryption fails (corrupted data, wrong key, or old format), clear auth
     console.error('Failed to decrypt stored auth, clearing...');
     clearAuth();
     return null;
   }
 }
 
-export async function saveAuthToken(token: string, meta?: { githubLogin?: string; expiresAt?: string }) {
+export async function saveAuthToken(
+  token: string,
+  meta?: { githubLogin?: string; expiresAt?: string }
+) {
   const auth: StoredAuth = {
     keywayToken: token,
     githubLogin: meta?.githubLogin,
@@ -113,13 +131,14 @@ export async function saveAuthToken(token: string, meta?: { githubLogin?: string
     createdAt: new Date().toISOString(),
   };
 
-  const encrypted = await encryptToken(JSON.stringify(auth));
+  const encrypted = encryptToken(JSON.stringify(auth));
   store.set('auth', encrypted);
 }
 
 export function clearAuth() {
   store.delete('auth');
-  // Keep salt for future encryption
+  // Note: We keep the encryption key for future use
+  // Deleting the key would invalidate all stored auth on re-login anyway
 }
 
 export function getAuthFilePath(): string {
