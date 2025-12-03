@@ -259,10 +259,12 @@ export async function pushCommand(options: PushOptions) {
                `or create '${requestedEnv}' via the dashboard.`;
       }
 
-      // Detect plan limit error (read-only vault on Free plan)
-      if (error.statusCode === 403 && message.toLowerCase().includes('read-only')) {
+      // Detect plan limit error (403 with upgradeUrl)
+      if (error.statusCode === 403 && error.upgradeUrl) {
+        hint = `${pc.yellow('⚡')} Upgrade to Pro: ${pc.cyan(error.upgradeUrl)}`;
+      } else if (error.statusCode === 403 && message.toLowerCase().includes('read-only')) {
         message = 'This vault is read-only on your current plan.';
-        hint = `Upgrade to Pro to unlock editing: ${pc.cyan(error.upgradeUrl || 'https://keyway.sh/settings')}`;
+        hint = `Upgrade to Pro to unlock editing: ${pc.cyan('https://keyway.sh/settings')}`;
       }
     } else if (error instanceof Error) {
       message = truncateMessage(error.message);
