@@ -315,7 +315,9 @@ export async function validateToken(token: string): Promise<ValidateTokenRespons
     body: JSON.stringify({}),
   });
 
-  return handleResponse<ValidateTokenResponse>(response);
+  // Response uses wrapper format: { data: ValidateTokenResponse, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: ValidateTokenResponse }>(response);
+  return wrapped.data;
 }
 
 // ==================== Provider Integrations ====================
@@ -331,7 +333,9 @@ export async function getProviders(): Promise<{ providers: ProviderInfo[] }> {
     },
   });
 
-  return handleResponse<{ providers: ProviderInfo[] }>(response);
+  // Response uses wrapper format: { data: { providers }, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: { providers: ProviderInfo[] } }>(response);
+  return wrapped.data;
 }
 
 /**
@@ -346,13 +350,16 @@ export async function getConnections(accessToken: string): Promise<{ connections
     },
   });
 
-  return handleResponse<{ connections: ConnectionInfo[] }>(response);
+  // Response uses wrapper format: { data: { connections }, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: { connections: ConnectionInfo[] } }>(response);
+  return wrapped.data;
 }
 
 /**
  * Delete a provider connection
+ * Returns 204 No Content on success
  */
-export async function deleteConnection(accessToken: string, connectionId: string): Promise<{ success: boolean }> {
+export async function deleteConnection(accessToken: string, connectionId: string): Promise<void> {
   const response = await fetchWithTimeout(`${API_BASE_URL}/v1/integrations/connections/${connectionId}`, {
     method: 'DELETE',
     headers: {
@@ -361,7 +368,8 @@ export async function deleteConnection(accessToken: string, connectionId: string
     },
   });
 
-  return handleResponse<{ success: boolean }>(response);
+  // DELETE returns 204 No Content - handleResponse returns {} for empty responses
+  await handleResponse<Record<string, never>>(response);
 }
 
 /**
@@ -387,7 +395,9 @@ export async function getConnectionProjects(
     },
   });
 
-  return handleResponse<{ projects: ProviderProject[] }>(response);
+  // Response uses wrapper format: { data: { projects }, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: { projects: ProviderProject[] } }>(response);
+  return wrapped.data;
 }
 
 /**
@@ -418,7 +428,9 @@ export async function getSyncStatus(
     }
   );
 
-  return handleResponse<SyncStatusInfo>(response);
+  // Response uses wrapper format: { data: SyncStatusInfo, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: SyncStatusInfo }>(response);
+  return wrapped.data;
 }
 
 /**
@@ -459,7 +471,9 @@ export async function getSyncPreview(
     60000 // 60 seconds for sync operations
   );
 
-  return handleResponse<SyncPreview>(response);
+  // Response uses wrapper format: { data: SyncPreview, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: SyncPreview }>(response);
+  return wrapped.data;
 }
 
 /**
@@ -501,5 +515,7 @@ export async function executeSync(
     120000 // 2 minutes for sync execution
   );
 
-  return handleResponse<SyncResult>(response);
+  // Response uses wrapper format: { data: SyncResult, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: SyncResult }>(response);
+  return wrapped.data;
 }
