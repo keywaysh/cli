@@ -519,3 +519,34 @@ export async function executeSync(
   const wrapped = await handleResponse<{ data: SyncResult }>(response);
   return wrapped.data;
 }
+
+// ==================== GitHub App Installation ====================
+
+export interface GitHubAppInstallationStatus {
+  installed: boolean;
+  installationId?: number;
+  installUrl: string;
+  message?: string;
+}
+
+/**
+ * Check if GitHub App is installed for a repository
+ */
+export async function checkGitHubAppInstallation(
+  repoOwner: string,
+  repoName: string,
+  accessToken: string
+): Promise<GitHubAppInstallationStatus> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/github/check-installation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ repoOwner, repoName }),
+  });
+
+  const wrapped = await handleResponse<{ data: GitHubAppInstallationStatus }>(response);
+  return wrapped.data;
+}

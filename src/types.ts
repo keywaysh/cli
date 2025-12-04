@@ -40,6 +40,7 @@ export interface DeviceStartResponse {
   verificationUri?: string;
   expiresIn?: number;
   interval?: number;
+  githubAppInstallUrl?: string;
 }
 
 export interface DevicePollResponse {
