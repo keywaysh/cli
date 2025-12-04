@@ -49,14 +49,23 @@ async function ensureLoginAndGitHubApp(
   // Check if already logged in
   const envToken = process.env.KEYWAY_TOKEN;
   if (envToken) {
-    // User has env token, just check GitHub App installation
-    return ensureGitHubAppInstalledOnly(repoFullName, envToken);
+    // User has env token, check GitHub App installation
+    const result = await ensureGitHubAppInstalledOnly(repoFullName, envToken);
+    if (result === null) {
+      // Token was invalid - for env tokens, user must fix manually
+      throw new Error('KEYWAY_TOKEN is invalid or expired. Please update the token.');
+    }
+    return result;
   }
 
   const stored = await getStoredAuth();
   if (stored?.keywayToken) {
-    // User is already logged in, just check GitHub App installation
-    return ensureGitHubAppInstalledOnly(repoFullName, stored.keywayToken);
+    // User is already logged in, try to check GitHub App installation
+    const result = await ensureGitHubAppInstalledOnly(repoFullName, stored.keywayToken);
+    if (result !== null) {
+      return result;
+    }
+    // Token was invalid (401), fall through to unified login flow below
   }
 
   // User is NOT logged in - use unified flow
@@ -150,14 +159,28 @@ async function ensureLoginAndGitHubApp(
 
 /**
  * Check GitHub App installation when user is already logged in.
+ * Returns null if the token is invalid (401 error), signaling that re-auth is needed.
  */
 async function ensureGitHubAppInstalledOnly(
   repoFullName: string,
   accessToken: string
-): Promise<string> {
+): Promise<string | null> {
   const [repoOwner, repoName] = repoFullName.split('/');
 
-  const status = await checkGitHubAppInstallation(repoOwner, repoName, accessToken);
+  let status;
+  try {
+    status = await checkGitHubAppInstallation(repoOwner, repoName, accessToken);
+  } catch (error) {
+    // If we get a 401, the token is invalid (user not found in this environment)
+    // Clear the stored token and signal that re-auth is needed
+    if (error instanceof APIError && error.statusCode === 401) {
+      console.log(pc.yellow('\n⚠ Session expired or invalid. Clearing credentials...'));
+      const { clearAuth } = await import('../utils/auth.js');
+      clearAuth();
+      return null; // Signal that we need to restart auth flow
+    }
+    throw error;
+  }
 
   if (status.installed) {
     return accessToken;
