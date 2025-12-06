@@ -35,7 +35,7 @@ describe('insertBadgeIntoReadme', () => {
   });
 
   it('inserts at top when only h2 title (no h1)', () => {
-    // The regex /^#(?!#)\s+/ only matches h1 ("# "), not h2+ ("## "), so h2-only content gets badge at top
+    // The regex /^#\s+/ only matches h1 ("# "), not h2+ ("## "), so h2-only content gets badge at top
     const content = '## Secondary Title\n\nContent here';
     const updated = insertBadgeIntoReadme(content, badge);
     expect(updated).toBe(`${badge}\n\n${content}`);
@@ -105,5 +105,85 @@ npm run dev
 # this is a comment
 yarn dev
 \`\`\``);
+  });
+
+  // UC1: Existing badges on dedicated line
+  it('UC1: inserts after existing badges on same line', () => {
+    const existingBadge = '[![npm](https://img.shields.io/npm/v/pkg.svg)](https://npmjs.com/pkg)';
+    const content = `# My Project\n\n${existingBadge}\n\n## Features`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    expect(updated).toBe(`# My Project\n\n${existingBadge} ${badge}\n\n## Features`);
+  });
+
+  // UC2: Badge inline in text
+  it('UC2: inserts after badge inline in text', () => {
+    const existingBadge = '[![test](https://test.com/badge.svg)](https://test.com)';
+    const content = `# Project\n\nCheck out ${existingBadge} for more info.`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    expect(updated).toBe(`# Project\n\nCheck out ${existingBadge} ${badge} for more info.`);
+  });
+
+  // UC5: H1 inside code block should be ignored
+  it('UC5: ignores H1 inside code block', () => {
+    const content = `Here's an example:
+\`\`\`bash
+# This is a shell comment, not a title
+echo "hello"
+\`\`\`
+
+# Real Title
+
+Content here.`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    // Badge should be inserted after "# Real Title", not after the shell comment
+    expect(updated).toContain('# Real Title\n\n' + badge);
+    // The shell comment should still be there (inside code block)
+    expect(updated).toContain('# This is a shell comment');
+    // Only one badge inserted
+    expect(updated.split(badge).length).toBe(2);
+  });
+
+  // UC6: H1 inside HTML comment should be ignored
+  it('UC6: ignores H1 inside HTML comment', () => {
+    const content = `<!--
+# Draft Title (commented out)
+TODO: finalize title
+-->
+
+# Actual Title
+
+Content.`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    expect(updated).toContain('# Actual Title\n\n' + badge);
+  });
+
+  // UC7: URLs with parentheses (Wikipedia-style)
+  it('UC7: handles badge URLs with parentheses', () => {
+    const wikiLink = '[![Wiki](https://badge.svg)](https://en.wikipedia.org/wiki/Foo_(disambiguation))';
+    const content = `# Project\n\n${wikiLink}\n\n## About`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    // Should insert after the wiki badge without breaking the URL
+    expect(updated).toBe(`# Project\n\n${wikiLink} ${badge}\n\n## About`);
+  });
+
+  // UC12: Multiple lines of badges
+  it('UC12: inserts on last line of multi-line badges', () => {
+    const badge1 = '[![badge1](url1)](link1)';
+    const badge2 = '[![badge2](url2)](link2)';
+    const badge3 = '[![badge3](url3)](link3)';
+    const content = `# Project\n\n${badge1}\n${badge2}\n${badge3}\n\n## Features`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    // Should insert after badge3 (the last badge)
+    expect(updated).toBe(`# Project\n\n${badge1}\n${badge2}\n${badge3} ${badge}\n\n## Features`);
+  });
+
+  // UC4: Tense title (no blank line after H1)
+  it('UC4: handles tense title - no blank line after H1', () => {
+    const content = `# My Project
+Some description immediately after.
+
+## Features`;
+    const updated = insertBadgeIntoReadme(content, badge);
+    expect(updated).toBe(`# My Project\n\n${badge}\n\nSome description immediately after.\n\n## Features`);
   });
 });
