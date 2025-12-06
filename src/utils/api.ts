@@ -521,6 +521,33 @@ export async function executeSync(
 }
 
 /**
+ * Check if a vault exists for a repository
+ */
+export async function checkVaultExists(
+  accessToken: string,
+  repoFullName: string
+): Promise<boolean> {
+  const [owner, repo] = repoFullName.split('/');
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/v1/vaults/${owner}/${repo}`,
+      {
+        method: 'GET',
+        headers: {
+          'User-Agent': USER_AGENT,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get vault environments for a repository
  */
 export async function getVaultEnvironments(

@@ -2,7 +2,7 @@ import pc from 'picocolors';
 import prompts from 'prompts';
 import open from 'open';
 import { getCurrentRepoFullName } from '../utils/git.js';
-import { APIError, initVault, truncateMessage, checkGitHubAppInstallation } from '../utils/api.js';
+import { APIError, initVault, truncateMessage, checkGitHubAppInstallation, checkVaultExists } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics, identifyUser } from '../utils/analytics.js';
 import { addBadgeToReadme } from './readme.js';
 import { discoverEnvCandidates, pushCommand } from './push.js';
@@ -258,6 +258,17 @@ export async function initCommand(options: InitOptions = {}) {
     });
 
     trackEvent(AnalyticsEvents.CLI_INIT, { repoFullName, githubAppInstalled: true });
+
+    // Check if vault already exists before trying to create
+    const vaultExists = await checkVaultExists(accessToken, repoFullName);
+    if (vaultExists) {
+      console.log(pc.green('\n✓ Already initialized!\n'));
+      console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets`);
+      console.log(`  ${pc.blue('⎔')} Dashboard: ${pc.underline(dashboardLink)}`);
+      console.log('');
+      await shutdownAnalytics();
+      return;
+    }
 
     await initVault(repoFullName, accessToken);
 
