@@ -314,7 +314,7 @@ export async function initCommand(options: InitOptions = {}) {
     // Handle specific error cases with friendly messages
     if (error instanceof APIError) {
       if (error.statusCode === 409) {
-        console.log(pc.yellow('\n⚠ Vault already exists for this repository.\n'));
+        console.log(pc.green('\n✓ Already initialized!\n'));
         console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets`);
         console.log(`  ${pc.blue('⎔')} Dashboard: ${pc.underline(`${DASHBOARD_URL}/${getCurrentRepoFullName()}`)}`);
         console.log('');
