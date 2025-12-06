@@ -521,6 +521,28 @@ export async function executeSync(
 }
 
 /**
+ * Connect to a provider using a direct API token (e.g., Railway)
+ */
+export async function connectWithToken(
+  accessToken: string,
+  provider: string,
+  providerToken: string
+): Promise<{ success: boolean; provider: string; user: { id: string; username: string; teamName?: string } }> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/integrations/${provider}/connect`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ token: providerToken }),
+  });
+
+  const wrapped = await handleResponse<{ data: { success: boolean; provider: string; user: { id: string; username: string; teamName?: string } } }>(response);
+  return wrapped.data;
+}
+
+/**
  * Check if a vault exists for a repository
  */
 export async function checkVaultExists(

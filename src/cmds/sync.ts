@@ -22,6 +22,33 @@ export function mapToVercelEnvironment(keywayEnv: string): string {
   };
   return mapping[keywayEnv.toLowerCase()] || 'production';
 }
+
+/**
+ * Map Keyway environment to Railway environment
+ */
+export function mapToRailwayEnvironment(keywayEnv: string): string {
+  const mapping: Record<string, string> = {
+    production: 'production',
+    staging: 'staging',
+    dev: 'development',
+    development: 'development',
+  };
+  return mapping[keywayEnv.toLowerCase()] || 'production';
+}
+
+/**
+ * Map Keyway environment to provider environment
+ */
+function mapToProviderEnvironment(provider: string, keywayEnv: string): string {
+  switch (provider.toLowerCase()) {
+    case 'vercel':
+      return mapToVercelEnvironment(keywayEnv);
+    case 'railway':
+      return mapToRailwayEnvironment(keywayEnv);
+    default:
+      return keywayEnv;
+  }
+}
 import { ensureLogin } from './login.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
@@ -349,7 +376,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
 
         // Auto-map to provider environment
         if (!options.providerEnv) {
-          providerEnv = mapToVercelEnvironment(keywayEnv);
+          providerEnv = mapToProviderEnvironment(provider, keywayEnv);
         }
       }
 

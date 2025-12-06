@@ -1,12 +1,128 @@
 import pc from 'picocolors';
 import open from 'open';
 import prompts from 'prompts';
-import { getProviders, getConnections, deleteConnection, getProviderAuthUrl, truncateMessage } from '../utils/api.js';
+import { getProviders, getConnections, deleteConnection, getProviderAuthUrl, connectWithToken, truncateMessage } from '../utils/api.js';
 import { ensureLogin } from './login.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
 
+// Providers that use direct token auth instead of OAuth
+const TOKEN_AUTH_PROVIDERS = ['railway'];
+
 interface ConnectOptions {
   loginPrompt?: boolean;
+}
+
+/**
+ * Get the token creation URL for a provider
+ */
+function getTokenCreationUrl(provider: string): string {
+  switch (provider) {
+    case 'railway':
+      return 'https://railway.com/account/tokens';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Connect using token-based auth (Railway)
+ */
+async function connectWithTokenFlow(
+  accessToken: string,
+  provider: string,
+  displayName: string
+): Promise<boolean> {
+  const tokenUrl = getTokenCreationUrl(provider);
+
+  console.log(pc.gray(`Create a ${displayName} API Token at:`));
+  console.log(pc.cyan(`→ ${tokenUrl}\n`));
+
+  if (provider === 'railway') {
+    console.log(pc.yellow('Tip: Select the workspace containing your projects.'));
+    console.log(pc.yellow('     Do NOT use "No workspace" - it won\'t have access to your projects.\n'));
+  }
+
+  const { token } = await prompts({
+    type: 'password',
+    name: 'token',
+    message: `${displayName} API Token:`,
+  });
+
+  if (!token) {
+    console.log(pc.gray('Cancelled.'));
+    return false;
+  }
+
+  console.log(pc.gray('\nValidating token...'));
+
+  try {
+    const result = await connectWithToken(accessToken, provider, token);
+
+    if (result.success) {
+      console.log(pc.green(`\n✓ Connected to ${displayName}!`));
+      console.log(pc.gray(`  Account: ${result.user.username}`));
+      if (result.user.teamName) {
+        console.log(pc.gray(`  Team: ${result.user.teamName}`));
+      }
+      return true;
+    } else {
+      console.log(pc.red('\n✗ Connection failed.'));
+      return false;
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Token validation failed';
+    console.log(pc.red(`\n✗ ${message}`));
+    return false;
+  }
+}
+
+/**
+ * Connect using OAuth flow (Vercel, etc.)
+ */
+async function connectWithOAuthFlow(
+  accessToken: string,
+  provider: string,
+  displayName: string
+): Promise<boolean> {
+  const authUrl = getProviderAuthUrl(provider);
+  const startTime = new Date();
+
+  console.log(pc.gray('Opening browser for authorization...'));
+  console.log(pc.gray(`If the browser doesn't open, visit: ${authUrl}`));
+
+  await open(authUrl).catch(() => {
+    // Silent fail, user has the URL
+  });
+
+  // Poll for connection confirmation
+  console.log(pc.gray('Waiting for authorization...'));
+
+  const maxAttempts = 60; // 5 minutes max (5s * 60)
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    attempts++;
+
+    try {
+      const { connections } = await getConnections(accessToken);
+      const newConn = connections.find(c =>
+        c.provider === provider &&
+        new Date(c.createdAt) > startTime
+      );
+
+      if (newConn) {
+        console.log(pc.green(`\n✓ Connected to ${displayName}!`));
+        return true;
+      }
+    } catch {
+      // Ignore polling errors, keep trying
+    }
+  }
+
+  console.log(pc.red('\n✗ Authorization timeout.'));
+  console.log(pc.gray('Run `keyway connections` to check if the connection was established.'));
+  return false;
 }
 
 /**
@@ -53,48 +169,15 @@ export async function connectCommand(provider: string, options: ConnectOptions =
 
     console.log(pc.blue(`\nConnecting to ${providerInfo.displayName}...\n`));
 
-    // Open browser for OAuth
-    const authUrl = getProviderAuthUrl(provider.toLowerCase());
-    const startTime = new Date();
-
-    console.log(pc.gray('Opening browser for authorization...'));
-    console.log(pc.gray(`If the browser doesn't open, visit: ${authUrl}`));
-
-    await open(authUrl).catch(() => {
-      // Silent fail, user has the URL
-    });
-
-    // Poll for connection confirmation
-    console.log(pc.gray('Waiting for authorization...'));
-
-    const maxAttempts = 60; // 5 minutes max (5s * 60)
-    let attempts = 0;
     let connected = false;
 
-    while (attempts < maxAttempts) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      attempts++;
-
-      try {
-        const { connections } = await getConnections(accessToken);
-        const newConn = connections.find(c =>
-          c.provider === provider.toLowerCase() &&
-          new Date(c.createdAt) > startTime
-        );
-
-        if (newConn) {
-          connected = true;
-          console.log(pc.green(`\n✓ Connected to ${providerInfo.displayName}!`));
-          break;
-        }
-      } catch {
-        // Ignore polling errors, keep trying
-      }
-    }
-
-    if (!connected) {
-      console.log(pc.red('\n✗ Authorization timeout.'));
-      console.log(pc.gray('Run `keyway connections` to check if the connection was established.'));
+    // Check if this provider uses token auth instead of OAuth
+    if (TOKEN_AUTH_PROVIDERS.includes(provider.toLowerCase())) {
+      // Token-based auth flow (Railway)
+      connected = await connectWithTokenFlow(accessToken, provider.toLowerCase(), providerInfo.displayName);
+    } else {
+      // OAuth flow (Vercel, etc.)
+      connected = await connectWithOAuthFlow(accessToken, provider.toLowerCase(), providerInfo.displayName);
     }
 
     trackEvent(AnalyticsEvents.CLI_CONNECT, {
@@ -125,7 +208,7 @@ export async function connectionsCommand(options: ConnectOptions = {}) {
     if (connections.length === 0) {
       console.log(pc.gray('No provider connections found.'));
       console.log(pc.gray('\nConnect to a provider with: keyway connect <provider>'));
-      console.log(pc.gray('Available providers: vercel'));
+      console.log(pc.gray('Available providers: vercel, railway'));
       return;
     }
 
