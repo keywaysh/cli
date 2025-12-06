@@ -60,10 +60,25 @@ src/
 ### Key Patterns
 
 - **Authentication**: Device code flow (user approves in browser) or fine-grained PAT (`--token` flag)
-- **Token Storage**: Uses `conf` package, stored in `~/.config/keyway/`
+- **Token Storage**: Uses `conf` package (see locations below)
 - **Git Detection**: Auto-detects GitHub remote from `.git/config`
 - **Environment Detection**: Looks for `.env`, `.env.local`, `.env.development`
 - **Error Handling**: RFC 7807 errors from API, includes `upgradeUrl` for plan limits
+
+### Token Storage Locations
+
+The CLI stores credentials in two locations:
+
+**Config file** (via `conf` package with `projectName: 'keyway'`):
+- macOS: `~/Library/Preferences/keyway-nodejs/config.json`
+- Linux: `~/.config/keyway-nodejs/config.json`
+- Windows: `%APPDATA%/keyway-nodejs/Config/config.json`
+
+**Encryption key** (for encrypting the stored token):
+- All platforms: `~/.keyway/.key`
+
+`keyway logout` clears the `auth` key from the config file but preserves the encryption key.
+For a complete cleanup: `rm -rf ~/.keyway ~/Library/Preferences/keyway-nodejs` (macOS)
 
 ### API Client (`src/utils/api.ts`)
 

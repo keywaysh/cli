@@ -520,6 +520,34 @@ export async function executeSync(
   return wrapped.data;
 }
 
+/**
+ * Get vault environments for a repository
+ */
+export async function getVaultEnvironments(
+  accessToken: string,
+  repoFullName: string
+): Promise<string[]> {
+  const [owner, repo] = repoFullName.split('/');
+
+  try {
+    const response = await fetchWithTimeout(
+      `${API_BASE_URL}/v1/vaults/${owner}/${repo}`,
+      {
+        method: 'GET',
+        headers: {
+          'User-Agent': USER_AGENT,
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    const wrapped = await handleResponse<{ data: { environments?: string[] } }>(response);
+    return wrapped.data.environments || ['production'];
+  } catch {
+    return ['production'];
+  }
+}
+
 // ==================== GitHub App Installation ====================
 
 export interface GitHubAppInstallationStatus {

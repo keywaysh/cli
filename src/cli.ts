@@ -9,6 +9,7 @@ import { loginCommand, logoutCommand } from './cmds/login.js';
 import { doctorCommand } from './cmds/doctor.js';
 import { connectCommand, connectionsCommand, disconnectCommand } from './cmds/connect.js';
 import { syncCommand } from './cmds/sync.js';
+import { warnIfEnvNotGitignored } from './utils/git.js';
 import packageJson from '../package.json' with { type: 'json' };
 
 const program = new Command();
@@ -20,6 +21,7 @@ const showBanner = () => {
 };
 
 showBanner();
+warnIfEnvNotGitignored();
 
 program
   .name('keyway')
@@ -108,6 +110,7 @@ program
 program
   .command('sync <provider>')
   .description('Sync secrets with a provider (e.g., vercel)')
+  .option('--push', 'Export secrets from Keyway to provider')
   .option('--pull', 'Import secrets from provider to Keyway')
   .option('-e, --environment <env>', 'Keyway environment (default: production)')
   .option('--provider-env <env>', 'Provider environment (default: production)')

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   findMatchingProject,
   projectMatchesRepo,
+  mapToVercelEnvironment,
   ProjectWithLinkedRepo,
 } from '../src/cmds/sync.js';
 
@@ -184,5 +185,35 @@ describe('projectMatchesRepo', () => {
     };
 
     expect(projectMatchesRepo(project, 'owner/my-repo')).toBe(false);
+  });
+});
+
+describe('mapToVercelEnvironment', () => {
+  it('should map production to production', () => {
+    expect(mapToVercelEnvironment('production')).toBe('production');
+  });
+
+  it('should map staging to preview', () => {
+    expect(mapToVercelEnvironment('staging')).toBe('preview');
+  });
+
+  it('should map dev to development', () => {
+    expect(mapToVercelEnvironment('dev')).toBe('development');
+  });
+
+  it('should map development to development', () => {
+    expect(mapToVercelEnvironment('development')).toBe('development');
+  });
+
+  it('should be case-insensitive', () => {
+    expect(mapToVercelEnvironment('PRODUCTION')).toBe('production');
+    expect(mapToVercelEnvironment('Staging')).toBe('preview');
+    expect(mapToVercelEnvironment('DEV')).toBe('development');
+  });
+
+  it('should default to production for unknown environments', () => {
+    expect(mapToVercelEnvironment('test')).toBe('production');
+    expect(mapToVercelEnvironment('qa')).toBe('production');
+    expect(mapToVercelEnvironment('custom-env')).toBe('production');
   });
 });

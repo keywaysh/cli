@@ -7,12 +7,27 @@ import {
   getSyncPreview,
   executeSync,
   truncateMessage,
+  getVaultEnvironments,
 } from '../utils/api.js';
+
+/**
+ * Map Keyway environment to Vercel environment
+ */
+export function mapToVercelEnvironment(keywayEnv: string): string {
+  const mapping: Record<string, string> = {
+    production: 'production',
+    staging: 'preview',
+    dev: 'development',
+    development: 'development',
+  };
+  return mapping[keywayEnv.toLowerCase()] || 'production';
+}
 import { ensureLogin } from './login.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
 
 interface SyncOptions {
+  push?: boolean;
   pull?: boolean;
   environment?: string;
   providerEnv?: string;
@@ -302,14 +317,67 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       }
     }
 
-    const keywayEnv = options.environment || 'production';
-    const providerEnv = options.providerEnv || 'production';
-    const direction = options.pull ? 'pull' : 'push';
     const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
 
-    console.log(pc.gray(`Project: ${selectedProject.name}`));
-    console.log(pc.gray(`Environment: ${keywayEnv}${providerEnv !== keywayEnv ? ` → ${providerEnv}` : ''}`));
-    console.log(pc.gray(`Direction: ${direction === 'push' ? 'Keyway → ' + providerName : providerName + ' → Keyway'}`));
+    // Determine values from options or prompt
+    let keywayEnv = options.environment;
+    let providerEnv = options.providerEnv;
+    let direction: 'push' | 'pull' | undefined = options.push ? 'push' : options.pull ? 'pull' : undefined;
+
+    const needsEnvPrompt = !options.environment;
+    const needsDirectionPrompt = !direction;
+
+    if (needsEnvPrompt || needsDirectionPrompt) {
+      // Prompt for environment if not specified
+      if (needsEnvPrompt) {
+        const vaultEnvs = await getVaultEnvironments(accessToken, repoFullName);
+
+        const { selectedEnv } = await prompts({
+          type: 'select',
+          name: 'selectedEnv',
+          message: 'Keyway environment:',
+          choices: vaultEnvs.map(e => ({ title: e, value: e })),
+          initial: Math.max(0, vaultEnvs.indexOf('production')),
+        });
+
+        if (!selectedEnv) {
+          console.log(pc.gray('Cancelled.'));
+          process.exit(0);
+        }
+
+        keywayEnv = selectedEnv;
+
+        // Auto-map to provider environment
+        if (!options.providerEnv) {
+          providerEnv = mapToVercelEnvironment(keywayEnv);
+        }
+      }
+
+      // Prompt for direction if not specified
+      if (needsDirectionPrompt) {
+        const { selectedDirection } = await prompts({
+          type: 'select',
+          name: 'selectedDirection',
+          message: 'Sync direction:',
+          choices: [
+            { title: `Keyway → ${providerName}`, value: 'push' },
+            { title: `${providerName} → Keyway`, value: 'pull' },
+          ],
+        });
+
+        if (!selectedDirection) {
+          console.log(pc.gray('Cancelled.'));
+          process.exit(0);
+        }
+
+        direction = selectedDirection;
+      }
+    }
+
+    // Apply defaults
+    keywayEnv = keywayEnv || 'production';
+    providerEnv = providerEnv || 'production';
+    direction = direction || 'push';
 
     // First-time detection
     const status = await getSyncStatus(
@@ -320,7 +388,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       keywayEnv
     );
 
-    if (status.isFirstSync && !options.pull && status.vaultIsEmpty && status.providerHasSecrets) {
+    if (status.isFirstSync && direction === 'push' && status.vaultIsEmpty && status.providerHasSecrets) {
       console.log(pc.yellow(`\n⚠️  Your Keyway vault is empty for "${keywayEnv}", but ${providerName} has ${status.providerSecretCount} secrets.`));
       console.log(pc.gray(`   (Use --environment to sync a different environment)`));
 

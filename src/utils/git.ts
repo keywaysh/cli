@@ -1,4 +1,7 @@
 import { execSync } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import pc from 'picocolors';
 
 export function getCurrentRepoFullName(): string {
   try {
@@ -58,4 +61,42 @@ function parseGitHubUrl(url: string): string {
   }
 
   throw new Error(`Invalid GitHub URL: ${url}`);
+}
+
+/**
+ * Check if .env files are in .gitignore
+ * Returns true if properly gitignored, false otherwise
+ */
+export function checkEnvGitignore(): boolean {
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    }).trim();
+
+    const gitignorePath = path.join(gitRoot, '.gitignore');
+
+    if (!fs.existsSync(gitignorePath)) {
+      return false;
+    }
+
+    const content = fs.readFileSync(gitignorePath, 'utf-8');
+    const lines = content.split('\n').map(l => l.trim());
+
+    // Check for patterns that would ignore .env files
+    const envPatterns = ['.env', '.env*', '.env.*', '*.env'];
+    return envPatterns.some(pattern => lines.includes(pattern));
+  } catch {
+    // Not a git repo or other error - don't warn
+    return true;
+  }
+}
+
+/**
+ * Print warning if .env files are not gitignored
+ */
+export function warnIfEnvNotGitignored(): void {
+  if (!checkEnvGitignore()) {
+    console.log(pc.yellow('⚠️  .env files are not in .gitignore - secrets may be committed'));
+  }
 }
