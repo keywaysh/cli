@@ -50,6 +50,7 @@ function mapToProviderEnvironment(provider: string, keywayEnv: string): string {
   }
 }
 import { ensureLogin } from './login.js';
+import { connectCommand } from './connect.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
 
@@ -207,13 +208,39 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     console.log(pc.gray(`Repository: ${repoFullName}`));
 
     // Get provider connection
-    const { connections } = await getConnections(accessToken);
-    const connection = connections.find(c => c.provider === provider.toLowerCase());
+    let { connections } = await getConnections(accessToken);
+    let connection = connections.find(c => c.provider === provider.toLowerCase());
 
     if (!connection) {
-      console.error(pc.red(`Not connected to ${provider}.`));
-      console.log(pc.gray(`Run: keyway connect ${provider}`));
-      process.exit(1);
+      const providerDisplayName = provider.charAt(0).toUpperCase() + provider.slice(1);
+      console.log(pc.yellow(`\nNot connected to ${providerDisplayName}.`));
+
+      const { shouldConnect } = await prompts({
+        type: 'confirm',
+        name: 'shouldConnect',
+        message: `Connect to ${providerDisplayName} now?`,
+        initial: true,
+      });
+
+      if (!shouldConnect) {
+        console.log(pc.gray('Cancelled.'));
+        process.exit(0);
+      }
+
+      // Run connect flow
+      await connectCommand(provider, { loginPrompt: false });
+
+      // Refresh connections
+      const refreshed = await getConnections(accessToken);
+      connections = refreshed.connections;
+      connection = connections.find(c => c.provider === provider.toLowerCase());
+
+      if (!connection) {
+        console.error(pc.red(`\nConnection to ${providerDisplayName} failed.`));
+        process.exit(1);
+      }
+
+      console.log(''); // Spacing before continuing with sync
     }
 
     // Get provider projects
