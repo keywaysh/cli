@@ -8,6 +8,7 @@ import { addBadgeToReadme } from './readme.js';
 import { discoverEnvCandidates, pushCommand } from './push.js';
 import { getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { pollDeviceLogin, startDeviceLogin } from '../utils/api.js';
+import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS } from '../utils/helpers.js';
 
 const DASHBOARD_URL = 'https://www.keyway.sh/dashboard/vaults';
 const POLL_INTERVAL_MS = 3000;
@@ -15,14 +16,6 @@ const POLL_TIMEOUT_MS = 120000; // 2 minutes
 
 interface InitOptions {
   loginPrompt?: boolean;
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isInteractive(): boolean {
-  return Boolean(process.stdout.isTTY && process.stdin.isTTY && !process.env.CI);
 }
 
 /**
@@ -110,6 +103,7 @@ async function ensureLoginAndGitHubApp(
   const pollIntervalMs = Math.max((deviceStart.interval ?? 5) * 1000, POLL_INTERVAL_MS);
   const startTime = Date.now();
   let accessToken: string | null = null;
+  let consecutiveErrors = 0;
 
   while (Date.now() - startTime < POLL_TIMEOUT_MS) {
     await sleep(pollIntervalMs);
@@ -144,9 +138,15 @@ async function ensureLoginAndGitHubApp(
         }
       }
 
+      consecutiveErrors = 0; // Reset on any successful API call
       process.stdout.write(pc.gray('.'));
-    } catch {
-      // Ignore polling errors, keep trying
+    } catch (error) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Setup failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
+      }
+      // Continue polling on transient errors
     }
   }
 
@@ -221,6 +221,8 @@ async function ensureGitHubAppInstalledOnly(
 
   // Poll for installation
   const startTime = Date.now();
+  let consecutiveErrors = 0;
+
   while (Date.now() - startTime < POLL_TIMEOUT_MS) {
     await sleep(POLL_INTERVAL_MS);
 
@@ -231,9 +233,15 @@ async function ensureGitHubAppInstalledOnly(
         console.log('');
         return accessToken;
       }
+      consecutiveErrors = 0; // Reset on successful API call
       process.stdout.write(pc.gray('.'));
-    } catch {
-      // Ignore polling errors, keep trying
+    } catch (error) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Installation check failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
+      }
+      // Continue polling on transient errors
     }
   }
 

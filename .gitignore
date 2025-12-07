@@ -10,3 +10,4 @@ CLAUDE.md
 AGENTS.md
 .claude/
 .pnpm-store/.claude
+coverage/

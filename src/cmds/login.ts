@@ -6,14 +6,7 @@ import { pollDeviceLogin, startDeviceLogin, validateToken, truncateMessage } fro
 import { clearAuth, getAuthFilePath, getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, identifyUser, AnalyticsEvents } from '../utils/analytics.js';
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isInteractive(): boolean {
-  return Boolean(process.stdout.isTTY && process.stdin.isTTY && !process.env.CI);
-}
+import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS } from '../utils/helpers.js';
 
 async function promptYesNo(question: string, defaultYes = true): Promise<boolean> {
   return new Promise((resolve) => {
@@ -56,6 +49,7 @@ export async function runLoginFlow(): Promise<string> {
   // Use server-provided expiration, capped at 30 minutes max
   const maxTimeoutMs = Math.min((start.expiresIn ?? 900) * 1000, 30 * 60 * 1000);
   const startTime = Date.now();
+  let consecutiveErrors = 0;
 
   while (true) {
     // Check for timeout
@@ -64,39 +58,50 @@ export async function runLoginFlow(): Promise<string> {
     }
 
     await sleep(pollIntervalMs);
-    const result = await pollDeviceLogin(start.deviceCode);
 
-    if (result.status === 'pending') {
-      continue;
-    }
+    try {
+      const result = await pollDeviceLogin(start.deviceCode);
+      consecutiveErrors = 0; // Reset on successful API call
 
-    if (result.status === 'approved' && result.keywayToken) {
-      await saveAuthToken(result.keywayToken, {
-        githubLogin: result.githubLogin,
-        expiresAt: result.expiresAt,
-      });
+      if (result.status === 'pending') {
+        continue;
+      }
 
-      trackEvent(AnalyticsEvents.CLI_LOGIN, {
-        method: 'device',
-        repo: repoName,
-      });
-
-      // Link analytics to the authenticated user
-      if (result.githubLogin) {
-        identifyUser(result.githubLogin, {
-          github_username: result.githubLogin,
-          login_method: 'device',
+      if (result.status === 'approved' && result.keywayToken) {
+        await saveAuthToken(result.keywayToken, {
+          githubLogin: result.githubLogin,
+          expiresAt: result.expiresAt,
         });
+
+        trackEvent(AnalyticsEvents.CLI_LOGIN, {
+          method: 'device',
+          repo: repoName,
+        });
+
+        // Link analytics to the authenticated user
+        if (result.githubLogin) {
+          identifyUser(result.githubLogin, {
+            github_username: result.githubLogin,
+            login_method: 'device',
+          });
+        }
+
+        console.log(pc.green('\n✓ Login successful'));
+        if (result.githubLogin) {
+          console.log(`Authenticated GitHub user: ${pc.cyan(result.githubLogin)}`);
+        }
+        return result.keywayToken;
       }
 
-      console.log(pc.green('\n✓ Login successful'));
-      if (result.githubLogin) {
-        console.log(`Authenticated GitHub user: ${pc.cyan(result.githubLogin)}`);
+      throw new Error(result.message || 'Authentication failed');
+    } catch (error) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Login failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
       }
-      return result.keywayToken;
+      // Continue polling on transient errors
     }
-
-    throw new Error(result.message || 'Authentication failed');
   }
 }
 

@@ -12,6 +12,12 @@ import { syncCommand } from './cmds/sync.js';
 import { warnIfEnvNotGitignored } from './utils/git.js';
 import packageJson from '../package.json' with { type: 'json' };
 
+// Handle unhandled promise rejections to prevent silent failures
+process.on('unhandledRejection', (reason) => {
+  console.error(pc.red('Unhandled error:'), reason);
+  process.exit(1);
+});
+
 const program = new Command();
 const TAGLINE = 'Sync secrets with your team and infra';
 
