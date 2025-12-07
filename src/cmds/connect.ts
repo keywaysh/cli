@@ -1,9 +1,9 @@
 import pc from 'picocolors';
-import open from 'open';
 import prompts from 'prompts';
 import { getProviders, getConnections, deleteConnection, getProviderAuthUrl, connectWithToken, truncateMessage } from '../utils/api.js';
 import { ensureLogin } from './login.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
+import { openUrl } from '../utils/helpers.js';
 
 // Providers that use direct token auth instead of OAuth
 const TOKEN_AUTH_PROVIDERS = ['railway'];
@@ -34,13 +34,12 @@ async function connectWithTokenFlow(
 ): Promise<boolean> {
   const tokenUrl = getTokenCreationUrl(provider);
 
-  console.log(pc.gray(`Create a ${displayName} API Token at:`));
-  console.log(pc.cyan(`→ ${tokenUrl}\n`));
-
   if (provider === 'railway') {
-    console.log(pc.yellow('Tip: Select the workspace containing your projects.'));
-    console.log(pc.yellow('     Do NOT use "No workspace" - it won\'t have access to your projects.\n'));
+    console.log(pc.yellow('\nTip: Select the workspace containing your projects.'));
+    console.log(pc.yellow('     Do NOT use "No workspace" - it won\'t have access to your projects.'));
   }
+
+  await openUrl(tokenUrl);
 
   const { token } = await prompts({
     type: 'password',
@@ -87,14 +86,7 @@ async function connectWithOAuthFlow(
   const authUrl = getProviderAuthUrl(provider);
   const startTime = new Date();
 
-  console.log(pc.gray('Opening browser for authorization...'));
-  console.log(pc.gray(`If the browser doesn't open, visit: ${authUrl}`));
-
-  await open(authUrl).catch(() => {
-    // Silent fail, user has the URL
-  });
-
-  // Poll for connection confirmation
+  await openUrl(authUrl);
   console.log(pc.gray('Waiting for authorization...'));
 
   const maxAttempts = 60; // 5 minutes max (5s * 60)

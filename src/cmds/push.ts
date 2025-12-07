@@ -6,6 +6,7 @@ import { getCurrentRepoFullName } from '../utils/git.js';
 import { APIError, pushSecrets, truncateMessage } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
+import { showUpgradePrompt } from '../utils/helpers.js';
 
 export function deriveEnvFromFile(file: string): string {
   const base = path.basename(file);
@@ -259,12 +260,21 @@ export async function pushCommand(options: PushOptions) {
                `or create '${requestedEnv}' via the dashboard.`;
       }
 
-      // Detect plan limit error (403 with upgradeUrl)
-      if (error.statusCode === 403 && error.upgradeUrl) {
-        hint = `${pc.yellow('⚡')} Upgrade to Pro: ${pc.cyan(error.upgradeUrl)}`;
-      } else if (error.statusCode === 403 && message.toLowerCase().includes('read-only')) {
-        message = 'This vault is read-only on your current plan.';
-        hint = `Upgrade to Pro to unlock editing: ${pc.cyan('https://keyway.sh/settings')}`;
+      // Detect plan limit error (403 with upgradeUrl or read-only)
+      if (error.statusCode === 403 && (error.upgradeUrl || message.toLowerCase().includes('read-only'))) {
+        const upgradeMessage = message.toLowerCase().includes('read-only')
+          ? 'This vault is read-only on your current plan.'
+          : message;
+        const upgradeUrl = error.upgradeUrl || 'https://keyway.sh/settings';
+
+        trackEvent(AnalyticsEvents.CLI_ERROR, {
+          command: 'push',
+          error: upgradeMessage,
+        });
+
+        await shutdownAnalytics();
+        showUpgradePrompt(upgradeMessage, upgradeUrl);
+        process.exit(1);
       }
     } else if (error instanceof Error) {
       message = truncateMessage(error.message);

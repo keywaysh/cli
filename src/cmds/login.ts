@@ -1,12 +1,11 @@
 import pc from 'picocolors';
 import readline from 'node:readline';
-import open from 'open';
 import prompts from 'prompts';
 import { pollDeviceLogin, startDeviceLogin, validateToken, truncateMessage } from '../utils/api.js';
 import { clearAuth, getAuthFilePath, getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, identifyUser, AnalyticsEvents } from '../utils/analytics.js';
-import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS } from '../utils/helpers.js';
+import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS, openUrl } from '../utils/helpers.js';
 
 async function promptYesNo(question: string, defaultYes = true): Promise<boolean> {
   return new Promise((resolve) => {
@@ -38,12 +37,8 @@ export async function runLoginFlow(): Promise<string> {
   }
 
   console.log(`Code: ${pc.bold(pc.green(start.userCode))}`);
+  await openUrl(verifyUrl);
   console.log('Waiting for auth...');
-
-  // Best-effort open browser; user still sees the URL.
-  open(verifyUrl).catch(() => {
-    console.log(pc.gray(`Open this URL in your browser: ${verifyUrl}`));
-  });
 
   const pollIntervalMs = (start.interval ?? 5) * 1000;
   // Use server-provided expiration, capped at 30 minutes max
@@ -148,11 +143,7 @@ async function runTokenLogin(): Promise<string> {
   const description = repoName ? `Keyway CLI for ${repoName}` : 'Keyway CLI';
   const url = `https://github.com/settings/personal-access-tokens/new?description=${encodeURIComponent(description)}`;
 
-  console.log('Opening GitHub...');
-  open(url).catch(() => {
-    console.log(pc.gray(`Open this URL in your browser: ${url}`));
-  });
-
+  await openUrl(url);
   console.log(pc.gray('Select the detected repo (or scope manually).'));
   console.log(pc.gray('Permissions: Metadata → Read-only; Account permissions: None.'));
 

@@ -41,6 +41,11 @@ vi.mock('prompts', () => ({
   default: (...args: any[]) => mockPrompts(...args),
 }));
 
+const mockShowUpgradePrompt = vi.fn();
+vi.mock('../src/utils/helpers.js', () => ({
+  showUpgradePrompt: (...args: any[]) => mockShowUpgradePrompt(...args),
+}));
+
 // Import after mocks are set up
 import { deriveEnvFromFile, discoverEnvCandidates } from '../src/cmds/push.js';
 import { APIError } from '../src/utils/api.js';
@@ -402,7 +407,10 @@ describe('pushCommand', () => {
 
       await expect(pushCommand({ yes: true })).rejects.toThrow('process.exit(1)');
       expect(lastExitCode).toBe(1);
-      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('keyway.sh/upgrade'));
+      expect(mockShowUpgradePrompt).toHaveBeenCalledWith(
+        'This vault is read-only on your current plan.',
+        'https://keyway.sh/upgrade'
+      );
     });
 
     it('should always shutdown analytics on error', async () => {

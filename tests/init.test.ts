@@ -17,8 +17,9 @@ const mockTrackEvent = vi.fn();
 const mockShutdownAnalytics = vi.fn().mockResolvedValue(undefined);
 const mockIdentifyUser = vi.fn();
 const mockPrompts = vi.fn();
-const mockOpen = vi.fn().mockResolvedValue(undefined);
 const mockAddBadgeToReadme = vi.fn();
+const mockOpenUrl = vi.fn().mockResolvedValue(undefined);
+const mockShowUpgradePrompt = vi.fn();
 const mockDiscoverEnvCandidates = vi.fn();
 const mockPushCommand = vi.fn();
 
@@ -67,10 +68,6 @@ vi.mock('prompts', () => ({
   default: mockPrompts,
 }));
 
-vi.mock('open', () => ({
-  default: mockOpen,
-}));
-
 vi.mock('../src/cmds/readme.js', () => ({
   addBadgeToReadme: mockAddBadgeToReadme,
 }));
@@ -84,6 +81,8 @@ vi.mock('../src/utils/helpers.js', () => ({
   sleep: vi.fn().mockResolvedValue(undefined),
   isInteractive: vi.fn().mockReturnValue(true),
   MAX_CONSECUTIVE_ERRORS: 5,
+  openUrl: mockOpenUrl,
+  showUpgradePrompt: mockShowUpgradePrompt,
 }));
 
 // Mock process.exit with exit code tracking
@@ -247,7 +246,7 @@ describe('initCommand', () => {
 
       await initCommand({});
 
-      expect(mockOpen).toHaveBeenCalledWith('https://install.url');
+      expect(mockOpenUrl).toHaveBeenCalledWith('https://install.url');
     });
 
     it('should exit with code 1 if user declines GitHub App installation', async () => {
@@ -288,7 +287,7 @@ describe('initCommand', () => {
       await initCommand({});
 
       expect(mockStartDeviceLogin).toHaveBeenCalledWith('owner/repo');
-      expect(mockOpen).toHaveBeenCalled();
+      expect(mockOpenUrl).toHaveBeenCalled();
       expect(mockSaveAuthToken).toHaveBeenCalledWith('new-jwt-token', {
         githubLogin: 'newuser',
         expiresAt: '2025-12-31T00:00:00Z',
@@ -351,8 +350,10 @@ describe('initCommand', () => {
 
       await expect(initCommand({})).rejects.toThrow('process.exit(1)');
       expect(lastExitCode).toBe(1);
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Plan Limit'));
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('keyway.sh/upgrade'));
+      expect(mockShowUpgradePrompt).toHaveBeenCalledWith(
+        'Free plan allows 1 vault',
+        'https://keyway.sh/upgrade'
+      );
     });
 
     it('should track errors to analytics and exit with code 1', async () => {

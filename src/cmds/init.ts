@@ -1,6 +1,5 @@
 import pc from 'picocolors';
 import prompts from 'prompts';
-import open from 'open';
 import { getCurrentRepoFullName } from '../utils/git.js';
 import { APIError, initVault, truncateMessage, checkGitHubAppInstallation, checkVaultExists } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics, identifyUser } from '../utils/analytics.js';
@@ -8,7 +7,7 @@ import { addBadgeToReadme } from './readme.js';
 import { discoverEnvCandidates, pushCommand } from './push.js';
 import { getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { pollDeviceLogin, startDeviceLogin } from '../utils/api.js';
-import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS } from '../utils/helpers.js';
+import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS, openUrl, showUpgradePrompt } from '../utils/helpers.js';
 
 const DASHBOARD_URL = 'https://www.keyway.sh/dashboard/vaults';
 const POLL_INTERVAL_MS = 3000;
@@ -92,10 +91,7 @@ async function ensureLoginAndGitHubApp(
 
   // Open browser to GitHub App installation page
   // User will authorize the app AND log in during installation
-  console.log(pc.gray('\n  Opening browser...'));
-  await open(installUrl);
-
-  console.log('');
+  await openUrl(installUrl);
   console.log(pc.blue('⏳ Waiting for installation & authorization...'));
   console.log(pc.gray('   (Press Ctrl+C to cancel)\n'));
 
@@ -212,10 +208,7 @@ async function ensureGitHubAppInstalledOnly(
   }
 
   // Open browser
-  console.log(pc.gray('\n  Opening browser...'));
-  await open(status.installUrl);
-
-  console.log('');
+  await openUrl(status.installUrl);
   console.log(pc.blue('⏳ Waiting for GitHub App installation...'));
   console.log(pc.gray('   (Press Ctrl+C to cancel)\n'));
 
@@ -343,17 +336,7 @@ export async function initCommand(options: InitOptions = {}) {
 
       if (error.error === 'Plan Limit Reached' || error.upgradeUrl) {
         const upgradeUrl = error.upgradeUrl || 'https://keyway.sh/pricing';
-        console.log('');
-        console.log(pc.dim('─'.repeat(50)));
-        console.log('');
-        console.log(`  ${pc.yellow('⚡')} ${pc.bold('Plan Limit Reached')}`);
-        console.log('');
-        console.log(pc.white(`  ${error.message}`));
-        console.log('');
-        console.log(`  ${pc.cyan('Upgrade now →')} ${pc.underline(upgradeUrl)}`);
-        console.log('');
-        console.log(pc.dim('─'.repeat(50)));
-        console.log('');
+        showUpgradePrompt(error.message, upgradeUrl);
         await shutdownAnalytics();
         process.exit(1);
       }

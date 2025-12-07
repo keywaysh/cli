@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS } from '../src/utils/helpers.js';
+
+// Mock dependencies before importing the module
+vi.mock('open', () => ({ default: vi.fn().mockResolvedValue(undefined) }));
+
+import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS, openUrl } from '../src/utils/helpers.js';
+import open from 'open';
+
+const mockOpen = vi.mocked(open);
 
 describe('helpers', () => {
   describe('sleep', () => {
@@ -96,6 +103,49 @@ describe('helpers', () => {
 
     it('should be 5', () => {
       expect(MAX_CONSECUTIVE_ERRORS).toBe(5);
+    });
+  });
+
+  describe('openUrl', () => {
+    let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      mockOpen.mockClear();
+      consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      consoleSpy.mockRestore();
+    });
+
+    it('should display the URL to the user', async () => {
+      await openUrl('https://example.com');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('https://example.com')
+      );
+    });
+
+    it('should attempt to open the URL in browser', async () => {
+      await openUrl('https://example.com');
+
+      expect(mockOpen).toHaveBeenCalledWith('https://example.com');
+    });
+
+    it('should not throw if open fails', async () => {
+      mockOpen.mockRejectedValueOnce(new Error('Failed to open'));
+
+      await expect(openUrl('https://example.com')).resolves.not.toThrow();
+    });
+
+    it('should still display URL even if open fails', async () => {
+      mockOpen.mockRejectedValueOnce(new Error('Failed to open'));
+
+      await openUrl('https://example.com');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('https://example.com')
+      );
     });
   });
 });
