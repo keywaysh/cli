@@ -5,9 +5,51 @@ import {
   mapToVercelEnvironment,
   mapToRailwayEnvironment,
   displayDiffSummary,
+  getProjectDisplayName,
   ProjectWithLinkedRepo,
 } from '../src/cmds/sync.js';
 import type { SyncDiff } from '../src/types.js';
+
+describe('getProjectDisplayName', () => {
+  it('should return serviceName when available', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'affectionate-success', // Random Railway project name
+      serviceName: 'keyway-backend', // Meaningful service name
+    };
+
+    expect(getProjectDisplayName(project)).toBe('keyway-backend');
+  });
+
+  it('should return name when serviceName is not available', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'my-vercel-project',
+    };
+
+    expect(getProjectDisplayName(project)).toBe('my-vercel-project');
+  });
+
+  it('should return name when serviceName is undefined', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'project-name',
+      serviceName: undefined,
+    };
+
+    expect(getProjectDisplayName(project)).toBe('project-name');
+  });
+
+  it('should return name when serviceName is empty string', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'project-name',
+      serviceName: '',
+    };
+
+    expect(getProjectDisplayName(project)).toBe('project-name');
+  });
+});
 
 describe('findMatchingProject', () => {
   const projects: ProjectWithLinkedRepo[] = [
@@ -348,6 +390,64 @@ describe('projectMatchesRepo edge cases', () => {
       linkedRepo: 'github.com/owner/repo', // Wrong format
     };
     expect(projectMatchesRepo(project, 'owner/repo')).toBe(false);
+  });
+});
+
+describe('projects with serviceName and environments', () => {
+  it('should handle projects with serviceName in findMatchingProject', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      {
+        id: '1',
+        name: 'random-name',
+        serviceName: 'keyway-backend',
+        linkedRepo: 'owner/keyway',
+        environments: ['production'],
+      },
+    ];
+    const result = findMatchingProject(projects, 'owner/keyway');
+    expect(result).toBeDefined();
+    expect(result!.project.serviceName).toBe('keyway-backend');
+    expect(result!.matchType).toBe('linked_repo');
+  });
+
+  it('should match by serviceName in exact name matching', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      {
+        id: '1',
+        name: 'random-railway-name',
+        serviceName: 'my-repo', // ServiceName matches repo name
+      },
+    ];
+    // Note: Current implementation doesn't match by serviceName in findMatchingProject
+    // It only matches by linkedRepo or project name, not serviceName
+    // This test documents current behavior
+    const result = findMatchingProject(projects, 'owner/my-repo');
+    // Should NOT match because matching is by name/linkedRepo, not serviceName
+    expect(result).toBeUndefined();
+  });
+
+  it('should preserve environments field in matched project', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      {
+        id: '1',
+        name: 'my-app',
+        linkedRepo: 'owner/my-app',
+        environments: ['production', 'staging', 'development'],
+      },
+    ];
+    const result = findMatchingProject(projects, 'owner/my-app');
+    expect(result).toBeDefined();
+    expect(result!.project.environments).toEqual(['production', 'staging', 'development']);
+  });
+
+  it('getProjectDisplayName should work with projects containing environments', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'random-name',
+      serviceName: 'my-service',
+      environments: ['production'],
+    };
+    expect(getProjectDisplayName(project)).toBe('my-service');
   });
 });
 

@@ -115,12 +115,21 @@ interface SyncOptions {
 export interface ProjectWithLinkedRepo {
   id: string;
   name: string;
+  serviceName?: string; // For Railway: the service name (more meaningful than project name)
   linkedRepo?: string;
+  environments?: string[]; // Available environments in the provider project
 }
 
 export interface ProjectMatch {
   project: ProjectWithLinkedRepo;
   matchType: 'linked_repo' | 'exact_name' | 'partial_name';
+}
+
+/**
+ * Get the display name for a project (serviceName for Railway, name for others)
+ */
+export function getProjectDisplayName(project: ProjectWithLinkedRepo): string {
+  return project.serviceName || project.name;
 }
 
 /**
@@ -196,20 +205,21 @@ async function promptProjectSelection(
 
   // Build choices with helpful labels
   const choices = projects.map(p => {
-    let title = p.name;
+    const displayName = getProjectDisplayName(p);
+    let title = displayName;
     const badges: string[] = [];
 
     // Add badges for matching projects
     if (p.linkedRepo?.toLowerCase() === repoFullName.toLowerCase()) {
       badges.push(pc.green('← linked'));
-    } else if (p.name.toLowerCase() === repoName) {
+    } else if (p.name.toLowerCase() === repoName || p.serviceName?.toLowerCase() === repoName) {
       badges.push(pc.green('← same name'));
     } else if (p.linkedRepo) {
       badges.push(pc.gray(`→ ${p.linkedRepo}`));
     }
 
     if (badges.length > 0) {
-      title = `${p.name} ${badges.join(' ')}`;
+      title = `${displayName} ${badges.join(' ')}`;
     }
 
     return { title, value: p.id };
@@ -302,14 +312,16 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     let selectedProject: ProjectWithLinkedRepo;
 
     if (options.project) {
-      // Use specified project
+      // Use specified project - match by id, name, or serviceName
       const found = projects.find(p =>
-        p.id === options.project || p.name.toLowerCase() === options.project?.toLowerCase()
+        p.id === options.project ||
+        p.name.toLowerCase() === options.project?.toLowerCase() ||
+        p.serviceName?.toLowerCase() === options.project?.toLowerCase()
       );
       if (!found) {
         console.error(pc.red(`Project not found: ${options.project}`));
         console.log(pc.gray('Available projects:'));
-        projects.forEach(p => console.log(pc.gray(`  - ${p.name}`)));
+        projects.forEach(p => console.log(pc.gray(`  - ${getProjectDisplayName(p)}`)));
         process.exit(1);
       }
       selectedProject = found;
@@ -321,7 +333,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
         console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
         console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
+        console.log(pc.yellow(`  Selected project:  ${getProjectDisplayName(selectedProject)}`));
         if (selectedProject.linkedRepo) {
           console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
         }
@@ -337,14 +349,15 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         const matchReason = autoMatch.matchType === 'linked_repo'
           ? `linked to ${repoFullName}`
           : 'exact name match';
-        console.log(pc.green(`✓ Auto-selected project: ${selectedProject.name} (${matchReason})`));
+        console.log(pc.green(`✓ Auto-selected project: ${getProjectDisplayName(selectedProject)} (${matchReason})`));
       } else if (autoMatch && autoMatch.matchType === 'partial_name') {
         // Partial match - ask for confirmation
-        console.log(pc.yellow(`Detected project: ${autoMatch.project.name} (partial match)`));
+        const partialDisplayName = getProjectDisplayName(autoMatch.project);
+        console.log(pc.yellow(`Detected project: ${partialDisplayName} (partial match)`));
         const { useDetected } = await prompts({
           type: 'confirm',
           name: 'useDetected',
-          message: `Use ${autoMatch.project.name}?`,
+          message: `Use ${partialDisplayName}?`,
           initial: true,
         });
 
@@ -362,7 +375,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
           console.log(pc.yellow('│  ⚠️  WARNING: Project does not match current repository     │'));
           console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
           console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-          console.log(pc.yellow(`  Only project:      ${selectedProject.name}`));
+          console.log(pc.yellow(`  Only project:      ${getProjectDisplayName(selectedProject)}`));
           if (selectedProject.linkedRepo) {
             console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
           }
@@ -398,7 +411,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         console.log(pc.yellow('│  ⚠️  WARNING: You selected a different project              │'));
         console.log(pc.yellow('└─────────────────────────────────────────────────────────────┘'));
         console.log(pc.yellow(`  Current repo:      ${repoFullName}`));
-        console.log(pc.yellow(`  Selected project:  ${selectedProject.name}`));
+        console.log(pc.yellow(`  Selected project:  ${getProjectDisplayName(selectedProject)}`));
         if (selectedProject.linkedRepo) {
           console.log(pc.yellow(`  Project linked to: ${selectedProject.linkedRepo}`));
         }
@@ -448,9 +461,46 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
 
         keywayEnv = selectedEnv;
 
-        // Auto-map to provider environment
+        // Determine provider environment
         if (!options.providerEnv) {
-          providerEnv = mapToProviderEnvironment(provider, keywayEnv);
+          // If the project has known environments (e.g., Railway), let user select from them
+          if (selectedProject.environments && selectedProject.environments.length > 0) {
+            // Try to find a matching environment first
+            const mappedEnv = mapToProviderEnvironment(provider, keywayEnv);
+            const envExists = selectedProject.environments.some(
+              e => e.toLowerCase() === mappedEnv.toLowerCase()
+            );
+
+            if (envExists) {
+              // Environment exists, auto-select
+              providerEnv = mappedEnv;
+            } else if (selectedProject.environments.length === 1) {
+              // Only one environment available, use it
+              providerEnv = selectedProject.environments[0];
+              console.log(pc.gray(`Using ${providerName} environment: ${providerEnv}`));
+            } else {
+              // Multiple environments, ask user to select
+              const { selectedProviderEnv } = await prompts({
+                type: 'select',
+                name: 'selectedProviderEnv',
+                message: `${providerName} environment:`,
+                choices: selectedProject.environments.map(e => ({ title: e, value: e })),
+                initial: Math.max(0, selectedProject.environments.findIndex(
+                  e => e.toLowerCase() === 'production'
+                )),
+              });
+
+              if (!selectedProviderEnv) {
+                console.log(pc.gray('Cancelled.'));
+                process.exit(0);
+              }
+
+              providerEnv = selectedProviderEnv;
+            }
+          } else {
+            // No environments known, auto-map as before
+            providerEnv = mapToProviderEnvironment(provider, keywayEnv);
+          }
         }
       }
 
