@@ -3,6 +3,7 @@ import {
   findMatchingProject,
   projectMatchesRepo,
   mapToVercelEnvironment,
+  mapToRailwayEnvironment,
   ProjectWithLinkedRepo,
 } from '../src/cmds/sync.js';
 
@@ -215,5 +216,135 @@ describe('mapToVercelEnvironment', () => {
     expect(mapToVercelEnvironment('test')).toBe('production');
     expect(mapToVercelEnvironment('qa')).toBe('production');
     expect(mapToVercelEnvironment('custom-env')).toBe('production');
+  });
+});
+
+describe('mapToRailwayEnvironment', () => {
+  it('should map production to production', () => {
+    expect(mapToRailwayEnvironment('production')).toBe('production');
+  });
+
+  it('should map staging to staging', () => {
+    expect(mapToRailwayEnvironment('staging')).toBe('staging');
+  });
+
+  it('should map dev to development', () => {
+    expect(mapToRailwayEnvironment('dev')).toBe('development');
+  });
+
+  it('should map development to development', () => {
+    expect(mapToRailwayEnvironment('development')).toBe('development');
+  });
+
+  it('should be case-insensitive', () => {
+    expect(mapToRailwayEnvironment('PRODUCTION')).toBe('production');
+    expect(mapToRailwayEnvironment('Staging')).toBe('staging');
+    expect(mapToRailwayEnvironment('DEV')).toBe('development');
+  });
+
+  it('should default to production for unknown environments', () => {
+    expect(mapToRailwayEnvironment('test')).toBe('production');
+    expect(mapToRailwayEnvironment('qa')).toBe('production');
+    expect(mapToRailwayEnvironment('custom-env')).toBe('production');
+  });
+
+  it('should differ from Vercel mapping for staging', () => {
+    // Vercel maps staging -> preview, Railway maps staging -> staging
+    expect(mapToVercelEnvironment('staging')).toBe('preview');
+    expect(mapToRailwayEnvironment('staging')).toBe('staging');
+  });
+});
+
+describe('findMatchingProject edge cases', () => {
+  it('should handle projects with empty names', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: '', linkedRepo: 'owner/repo' },
+    ];
+    const result = findMatchingProject(projects, 'owner/repo');
+    expect(result).toBeDefined();
+    expect(result!.matchType).toBe('linked_repo');
+  });
+
+  it('should handle repo names with special characters', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: 'my-app_v2.0', linkedRepo: 'owner/my-app_v2.0' },
+    ];
+    const result = findMatchingProject(projects, 'owner/my-app_v2.0');
+    expect(result).toBeDefined();
+    expect(result!.matchType).toBe('linked_repo');
+  });
+
+  it('should handle very long repo names', () => {
+    const longName = 'a'.repeat(100);
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: longName, linkedRepo: `owner/${longName}` },
+    ];
+    const result = findMatchingProject(projects, `owner/${longName}`);
+    expect(result).toBeDefined();
+    expect(result!.matchType).toBe('linked_repo');
+  });
+
+  it('should handle projects with null-ish linkedRepo', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: 'my-repo', linkedRepo: undefined },
+      { id: '2', name: 'other', linkedRepo: '' },
+    ];
+    const result = findMatchingProject(projects, 'owner/my-repo');
+    expect(result).toBeDefined();
+    expect(result!.project.id).toBe('1');
+    expect(result!.matchType).toBe('exact_name');
+  });
+
+  it('should handle multiple linkedRepo matches (first wins)', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: 'first', linkedRepo: 'owner/my-repo' },
+      { id: '2', name: 'second', linkedRepo: 'owner/my-repo' },
+    ];
+    const result = findMatchingProject(projects, 'owner/my-repo');
+    expect(result).toBeDefined();
+    expect(result!.project.id).toBe('1');
+  });
+
+  it('should handle org/repo format variations', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: 'repo', linkedRepo: 'Organization-Name/Repo-Name' },
+    ];
+    // Case insensitive match
+    const result = findMatchingProject(projects, 'organization-name/repo-name');
+    expect(result).toBeDefined();
+    expect(result!.matchType).toBe('linked_repo');
+  });
+
+  it('should match partial name when unique (expected behavior)', () => {
+    const projects: ProjectWithLinkedRepo[] = [
+      { id: '1', name: 'app', linkedRepo: 'owner/my-app' },
+    ];
+    // "app" is contained in "my-app-frontend", so partial match is found
+    // This is expected behavior - partial matches work when unique
+    const result = findMatchingProject(projects, 'owner/my-app-frontend');
+    expect(result).toBeDefined();
+    expect(result!.matchType).toBe('partial_name');
+  });
+});
+
+describe('projectMatchesRepo edge cases', () => {
+  it('should handle empty repo name', () => {
+    const project: ProjectWithLinkedRepo = { id: '1', name: 'test' };
+    expect(projectMatchesRepo(project, 'owner/')).toBe(false);
+  });
+
+  it('should match name even with missing owner (split gives empty string)', () => {
+    const project: ProjectWithLinkedRepo = { id: '1', name: 'test' };
+    // '/test'.split('/')[1] = 'test', which matches project.name
+    expect(projectMatchesRepo(project, '/test')).toBe(true);
+  });
+
+  it('should handle linkedRepo with different format', () => {
+    const project: ProjectWithLinkedRepo = {
+      id: '1',
+      name: 'test',
+      linkedRepo: 'github.com/owner/repo', // Wrong format
+    };
+    expect(projectMatchesRepo(project, 'owner/repo')).toBe(false);
   });
 });
