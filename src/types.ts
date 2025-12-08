@@ -93,6 +93,15 @@ export interface SyncPreview {
   toSkip: string[];
 }
 
+export interface SyncDiff {
+  keywayCount: number;
+  providerCount: number;
+  onlyInKeyway: string[];
+  onlyInProvider: string[];
+  different: string[];
+  same: string[];
+}
+
 export interface SyncResult {
   success: boolean;
   stats: {

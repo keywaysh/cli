@@ -11,6 +11,7 @@ import type {
   ConnectionInfo,
   ProviderProject,
   SyncStatusInfo,
+  SyncDiff,
   SyncPreview,
   SyncResult,
 } from '../types.js';
@@ -430,6 +431,44 @@ export async function getSyncStatus(
 
   // Response uses wrapper format: { data: SyncStatusInfo, meta: { requestId } }
   const wrapped = await handleResponse<{ data: SyncStatusInfo }>(response);
+  return wrapped.data;
+}
+
+/**
+ * Get bi-directional sync diff (compare Keyway vs Provider)
+ */
+export async function getSyncDiff(
+  accessToken: string,
+  repoFullName: string,
+  options: {
+    connectionId: string;
+    projectId: string;
+    keywayEnvironment?: string;
+    providerEnvironment?: string;
+  }
+): Promise<SyncDiff> {
+  const [owner, repo] = repoFullName.split('/');
+  const params = new URLSearchParams({
+    connectionId: options.connectionId,
+    projectId: options.projectId,
+    keywayEnvironment: options.keywayEnvironment || 'production',
+    providerEnvironment: options.providerEnvironment || 'production',
+  });
+
+  // Use longer timeout as it fetches secrets from both sides
+  const response = await fetchWithTimeout(
+    `${API_BASE_URL}/v1/integrations/vaults/${owner}/${repo}/sync/diff?${params}`,
+    {
+      method: 'GET',
+      headers: {
+        'User-Agent': USER_AGENT,
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+    60000 // 60 seconds
+  );
+
+  const wrapped = await handleResponse<{ data: SyncDiff }>(response);
   return wrapped.data;
 }
 

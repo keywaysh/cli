@@ -1,11 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   findMatchingProject,
   projectMatchesRepo,
   mapToVercelEnvironment,
   mapToRailwayEnvironment,
+  displayDiffSummary,
   ProjectWithLinkedRepo,
 } from '../src/cmds/sync.js';
+import type { SyncDiff } from '../src/types.js';
 
 describe('findMatchingProject', () => {
   const projects: ProjectWithLinkedRepo[] = [
@@ -346,5 +348,296 @@ describe('projectMatchesRepo edge cases', () => {
       linkedRepo: 'github.com/owner/repo', // Wrong format
     };
     expect(projectMatchesRepo(project, 'owner/repo')).toBe(false);
+  });
+});
+
+describe('displayDiffSummary', () => {
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleSpy.mockRestore();
+  });
+
+  it('should display "Already in sync" when no differences', () => {
+    const diff: SyncDiff = {
+      keywayCount: 5,
+      providerCount: 5,
+      onlyInKeyway: [],
+      onlyInProvider: [],
+      different: [],
+      same: ['VAR1', 'VAR2', 'VAR3', 'VAR4', 'VAR5'],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Already in sync'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('5 secrets'));
+  });
+
+  it('should display secrets only in Keyway', () => {
+    const diff: SyncDiff = {
+      keywayCount: 3,
+      providerCount: 0,
+      onlyInKeyway: ['DATABASE_URL', 'API_KEY', 'JWT_SECRET'],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Railway');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Comparison Summary'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('3 only in Keyway'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('DATABASE_URL'));
+  });
+
+  it('should display secrets only in provider', () => {
+    const diff: SyncDiff = {
+      keywayCount: 0,
+      providerCount: 2,
+      onlyInKeyway: [],
+      onlyInProvider: ['VERCEL_ENV', 'VERCEL_URL'],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('2 only in Vercel'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('VERCEL_ENV'));
+  });
+
+  it('should display secrets with different values', () => {
+    const diff: SyncDiff = {
+      keywayCount: 2,
+      providerCount: 2,
+      onlyInKeyway: [],
+      onlyInProvider: [],
+      different: ['API_KEY', 'DATABASE_URL'],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Railway');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('2 with different values'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('API_KEY'));
+  });
+
+  it('should display identical secrets count', () => {
+    const diff: SyncDiff = {
+      keywayCount: 5,
+      providerCount: 5,
+      onlyInKeyway: ['NEW_VAR'],
+      onlyInProvider: [],
+      different: [],
+      same: ['VAR1', 'VAR2', 'VAR3', 'VAR4'],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('4 identical'));
+  });
+
+  it('should display all categories when all have values', () => {
+    const diff: SyncDiff = {
+      keywayCount: 10,
+      providerCount: 8,
+      onlyInKeyway: ['KEYWAY_ONLY_1', 'KEYWAY_ONLY_2'],
+      onlyInProvider: ['PROVIDER_ONLY'],
+      different: ['CONFLICT_VAR'],
+      same: ['SAME_1', 'SAME_2', 'SAME_3', 'SAME_4', 'SAME_5'],
+    };
+
+    displayDiffSummary(diff, 'Railway');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Keyway: 10 secrets'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Railway: 8 secrets'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('2 only in Keyway'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('1 only in Railway'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('1 with different values'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('5 identical'));
+  });
+
+  it('should truncate long lists to 3 items with "and X more"', () => {
+    const diff: SyncDiff = {
+      keywayCount: 10,
+      providerCount: 0,
+      onlyInKeyway: ['VAR1', 'VAR2', 'VAR3', 'VAR4', 'VAR5', 'VAR6'],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('6 only in Keyway'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('VAR1'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('VAR2'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('VAR3'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('and 3 more'));
+  });
+
+  it('should handle empty diff with no secrets on either side', () => {
+    const diff: SyncDiff = {
+      keywayCount: 0,
+      providerCount: 0,
+      onlyInKeyway: [],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Railway');
+
+    // Should show comparison summary with 0 secrets
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Keyway: 0 secrets'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Railway: 0 secrets'));
+  });
+
+  it('should handle provider names with special characters', () => {
+    const diff: SyncDiff = {
+      keywayCount: 1,
+      providerCount: 1,
+      onlyInKeyway: [],
+      onlyInProvider: ['SPECIAL_VAR'],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Provider-Name_123');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Provider-Name_123: 1 secrets'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('1 only in Provider-Name_123'));
+  });
+
+  it('should display correct arrow symbols for direction hints', () => {
+    const diff: SyncDiff = {
+      keywayCount: 2,
+      providerCount: 1,
+      onlyInKeyway: ['KEYWAY_VAR'],
+      onlyInProvider: ['PROVIDER_VAR'],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    // Check that the output contains the right directional symbols
+    const calls = consoleSpy.mock.calls.map(call => call[0]);
+    const hasRightArrow = calls.some(call => typeof call === 'string' && call.includes('→'));
+    const hasLeftArrow = calls.some(call => typeof call === 'string' && call.includes('←'));
+
+    expect(hasRightArrow).toBe(true); // → for onlyInKeyway
+    expect(hasLeftArrow).toBe(true);  // ← for onlyInProvider
+  });
+});
+
+describe('SyncDiff edge cases', () => {
+  let consoleSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleSpy.mockRestore();
+  });
+
+  it('should handle very long secret names', () => {
+    const longName = 'A'.repeat(100);
+    const diff: SyncDiff = {
+      keywayCount: 1,
+      providerCount: 0,
+      onlyInKeyway: [longName],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining(longName));
+  });
+
+  it('should handle secret names with special characters', () => {
+    const diff: SyncDiff = {
+      keywayCount: 3,
+      providerCount: 0,
+      onlyInKeyway: ['MY_VAR_123', 'SPECIAL-VAR', 'var.with.dots'],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    displayDiffSummary(diff, 'Railway');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('MY_VAR_123'));
+  });
+
+  it('should handle large number of secrets', () => {
+    const manySecrets = Array.from({ length: 1000 }, (_, i) => `VAR_${i}`);
+    const diff: SyncDiff = {
+      keywayCount: 1000,
+      providerCount: 500,
+      onlyInKeyway: manySecrets.slice(0, 500),
+      onlyInProvider: [],
+      different: [],
+      same: manySecrets.slice(500),
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('500 only in Keyway'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('and 497 more'));
+  });
+
+  it('should handle counts mismatch with arrays (defensive)', () => {
+    // Test that the display still works even if counts don't match array lengths
+    const diff: SyncDiff = {
+      keywayCount: 100, // Doesn't match actual array
+      providerCount: 50,
+      onlyInKeyway: ['VAR1'],
+      onlyInProvider: ['VAR2'],
+      different: [],
+      same: [],
+    };
+
+    // Should not throw
+    expect(() => displayDiffSummary(diff, 'Railway')).not.toThrow();
+  });
+
+  it('should handle unicode in secret names', () => {
+    const diff: SyncDiff = {
+      keywayCount: 1,
+      providerCount: 0,
+      onlyInKeyway: ['VAR_日本語'],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    };
+
+    expect(() => displayDiffSummary(diff, 'Vercel')).not.toThrow();
+  });
+
+  it('should display nothing for identical category when count is 0', () => {
+    const diff: SyncDiff = {
+      keywayCount: 2,
+      providerCount: 0,
+      onlyInKeyway: ['VAR1', 'VAR2'],
+      onlyInProvider: [],
+      different: [],
+      same: [], // Empty
+    };
+
+    displayDiffSummary(diff, 'Vercel');
+
+    const calls = consoleSpy.mock.calls.map(call => call[0]);
+    const hasIdentical = calls.some(call => typeof call === 'string' && call.includes('identical'));
+
+    expect(hasIdentical).toBe(false); // Should not show "0 identical"
   });
 });

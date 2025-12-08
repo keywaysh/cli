@@ -4,11 +4,13 @@ import {
   getConnections,
   getConnectionProjects,
   getSyncStatus,
+  getSyncDiff,
   getSyncPreview,
   executeSync,
   truncateMessage,
   getVaultEnvironments,
 } from '../utils/api.js';
+import type { SyncDiff } from '../types.js';
 
 /**
  * Map Keyway environment to Vercel environment
@@ -53,6 +55,51 @@ import { ensureLogin } from './login.js';
 import { connectCommand } from './connect.js';
 import { detectGitRepo } from '../utils/git.js';
 import { trackEvent, AnalyticsEvents } from '../utils/analytics.js';
+
+/**
+ * Display a bi-directional diff summary
+ */
+export function displayDiffSummary(diff: SyncDiff, providerName: string): void {
+  const totalDiff = diff.onlyInKeyway.length + diff.onlyInProvider.length + diff.different.length;
+
+  if (totalDiff === 0 && diff.same.length > 0) {
+    console.log(pc.green(`\n✓ Already in sync (${diff.same.length} secrets)`));
+    return;
+  }
+
+  console.log(pc.blue('\n📊 Comparison Summary\n'));
+  console.log(pc.gray(`   Keyway: ${diff.keywayCount} secrets | ${providerName}: ${diff.providerCount} secrets\n`));
+
+  if (diff.onlyInKeyway.length > 0) {
+    console.log(pc.cyan(`   → ${diff.onlyInKeyway.length} only in Keyway`));
+    diff.onlyInKeyway.slice(0, 3).forEach(key => console.log(pc.gray(`      ${key}`)));
+    if (diff.onlyInKeyway.length > 3) {
+      console.log(pc.gray(`      ... and ${diff.onlyInKeyway.length - 3} more`));
+    }
+  }
+
+  if (diff.onlyInProvider.length > 0) {
+    console.log(pc.magenta(`   ← ${diff.onlyInProvider.length} only in ${providerName}`));
+    diff.onlyInProvider.slice(0, 3).forEach(key => console.log(pc.gray(`      ${key}`)));
+    if (diff.onlyInProvider.length > 3) {
+      console.log(pc.gray(`      ... and ${diff.onlyInProvider.length - 3} more`));
+    }
+  }
+
+  if (diff.different.length > 0) {
+    console.log(pc.yellow(`   ≠ ${diff.different.length} with different values`));
+    diff.different.slice(0, 3).forEach(key => console.log(pc.gray(`      ${key}`)));
+    if (diff.different.length > 3) {
+      console.log(pc.gray(`      ... and ${diff.different.length - 3} more`));
+    }
+  }
+
+  if (diff.same.length > 0) {
+    console.log(pc.gray(`   = ${diff.same.length} identical`));
+  }
+
+  console.log('');
+}
 
 interface SyncOptions {
   push?: boolean;
@@ -404,6 +451,28 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         // Auto-map to provider environment
         if (!options.providerEnv) {
           providerEnv = mapToProviderEnvironment(provider, keywayEnv);
+        }
+      }
+
+      // Fetch and display bi-directional diff before asking for direction
+      if (needsDirectionPrompt) {
+        const effectiveKeywayEnv = keywayEnv || 'production';
+        const effectiveProviderEnv = providerEnv || mapToProviderEnvironment(provider, effectiveKeywayEnv);
+
+        console.log(pc.gray('\nComparing secrets...'));
+        const diff = await getSyncDiff(accessToken, repoFullName, {
+          connectionId: connection.id,
+          projectId: selectedProject.id,
+          keywayEnvironment: effectiveKeywayEnv,
+          providerEnvironment: effectiveProviderEnv,
+        });
+
+        displayDiffSummary(diff, providerName);
+
+        // If already in sync, exit early
+        const totalDiff = diff.onlyInKeyway.length + diff.onlyInProvider.length + diff.different.length;
+        if (totalDiff === 0) {
+          return;
         }
       }
 
