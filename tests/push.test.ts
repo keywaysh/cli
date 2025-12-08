@@ -345,6 +345,16 @@ describe('pushCommand', () => {
   });
 
   describe('file handling', () => {
+    it('should exit with code 1 if no .env file found and no --file provided', async () => {
+      // Don't create any .env file in the test directory
+
+      const { pushCommand } = await import('../src/cmds/push.js');
+
+      await expect(pushCommand({ yes: true })).rejects.toThrow('process.exit(1)');
+      expect(lastExitCode).toBe(1);
+      expect(mockConsoleError).toHaveBeenCalledWith(expect.stringContaining('No .env file found'));
+    });
+
     it('should exit with code 1 if file does not exist in non-interactive mode', async () => {
       Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true });
       Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });

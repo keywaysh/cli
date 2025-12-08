@@ -70,6 +70,11 @@ export async function pushCommand(options: PushOptions) {
 
     const candidates = discoverEnvCandidates(process.cwd());
 
+    // If no env files found and no explicit --file provided, fail early
+    if (candidates.length === 0 && !envFile) {
+      throw new Error('No .env file found. Create a .env file first, or use --file <path> to specify one.');
+    }
+
     // If env provided but file not, try to match a discovered file
     if (environment && !envFile) {
       const match = candidates.find((c) => c.env === environment);
@@ -136,37 +141,9 @@ export async function pushCommand(options: PushOptions) {
       envFile = '.env';
     }
 
-    let envFilePath = path.resolve(process.cwd(), envFile);
+    const envFilePath = path.resolve(process.cwd(), envFile);
     if (!fs.existsSync(envFilePath)) {
-      if (!isInteractive) {
-        throw new Error(`File not found: ${envFile}. Provide --file <path> or run interactively to choose a file.`);
-      }
-
-      const { newPath } = await prompts(
-        {
-          type: 'text',
-          name: 'newPath',
-          message: `File not found: ${envFile}. Enter an env file path to use:`,
-          validate: (value: string) => {
-            if (!value || typeof value !== 'string') return 'Path is required';
-            const resolved = path.resolve(process.cwd(), value);
-            if (!fs.existsSync(resolved)) return `File not found: ${value}`;
-            return true;
-          },
-        },
-        {
-          onCancel: () => {
-            throw new Error('Push cancelled (no env file provided).');
-          },
-        }
-      );
-
-      if (!newPath || typeof newPath !== 'string') {
-        throw new Error('Push cancelled (no env file provided).');
-      }
-
-      envFile = newPath.trim();
-      envFilePath = path.resolve(process.cwd(), envFile);
+      throw new Error(`File not found: ${envFile}`);
     }
 
     const content = fs.readFileSync(envFilePath, 'utf-8');
@@ -238,7 +215,9 @@ export async function pushCommand(options: PushOptions) {
     }
 
     console.log(`\nYour secrets are now encrypted and stored securely.`);
-    console.log(`To retrieve them, run: ${pc.cyan(`keyway pull --env ${environment}`)}`);
+
+    const dashboardLink = `https://www.keyway.sh/dashboard/vaults/${repoFullName}`;
+    console.log(`\n${pc.blue('⎔')} Dashboard: ${pc.underline(dashboardLink)}`);
 
     await shutdownAnalytics();
   } catch (error) {
