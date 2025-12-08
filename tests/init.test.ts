@@ -396,4 +396,32 @@ describe('initCommand', () => {
       expect(mockPushCommand).not.toHaveBeenCalled();
     });
   });
+
+  describe('empty vault warning', () => {
+    it('should show warning when no .env file is found', async () => {
+      mockDiscoverEnvCandidates.mockReturnValue([]);
+
+      const { initCommand } = await import('../src/cmds/init.js');
+
+      await initCommand({});
+
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('No .env file found'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('vault is empty'));
+    });
+
+    it('should not show empty vault warning when .env files exist', async () => {
+      mockDiscoverEnvCandidates.mockReturnValue([{ file: '.env', env: 'development' }]);
+      mockPrompts.mockResolvedValue({ shouldPush: false });
+
+      const { initCommand } = await import('../src/cmds/init.js');
+
+      await initCommand({});
+
+      const calls = mockConsoleLog.mock.calls.map(call => call[0]);
+      const hasEmptyWarning = calls.some(msg =>
+        typeof msg === 'string' && msg.includes('No .env file found')
+      );
+      expect(hasEmptyWarning).toBe(false);
+    });
+  });
 });
