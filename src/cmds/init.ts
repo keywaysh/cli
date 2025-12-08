@@ -312,8 +312,8 @@ export async function initCommand(options: InitOptions = {}) {
     console.log('');
 
     if (envCandidates.length === 0) {
-      console.log(`  ${pc.yellow('→')} Create a ${pc.cyan('.env')} file with your secrets`);
-      console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync them\n`);
+      console.log(`${pc.yellow('⚠')} No .env file found - your vault is empty`);
+      console.log(`  Next: Create ${pc.cyan('.env')} and run ${pc.cyan('keyway push')}\n`);
     } else {
       console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets\n`);
     }
