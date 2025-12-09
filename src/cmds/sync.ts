@@ -505,12 +505,13 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       }
 
       // Fetch and display bi-directional diff before asking for direction
+      let diff: SyncDiff | undefined;
       if (needsDirectionPrompt) {
         const effectiveKeywayEnv = keywayEnv || 'production';
         const effectiveProviderEnv = providerEnv || mapToProviderEnvironment(provider, effectiveKeywayEnv);
 
         console.log(pc.gray('\nComparing secrets...'));
-        const diff = await getSyncDiff(accessToken, repoFullName, {
+        diff = await getSyncDiff(accessToken, repoFullName, {
           connectionId: connection.id,
           projectId: selectedProject.id,
           serviceId: selectedProject.serviceId, // Railway: service ID for service-specific variables
@@ -528,7 +529,18 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       }
 
       // Prompt for direction if not specified
-      if (needsDirectionPrompt) {
+      if (needsDirectionPrompt && diff) {
+        // Smart default: if one side is empty and the other has secrets, suggest appropriate direction
+        // - If Keyway is empty and Provider has secrets → suggest pull
+        // - If Provider is empty and Keyway has secrets → suggest push
+        // - Otherwise → default to push
+        let defaultDirection: 0 | 1 = 0; // 0 = push, 1 = pull
+        if (diff.keywayCount === 0 && diff.providerCount > 0) {
+          defaultDirection = 1; // pull
+        } else if (diff.providerCount === 0 && diff.keywayCount > 0) {
+          defaultDirection = 0; // push
+        }
+
         const { selectedDirection } = await prompts({
           type: 'select',
           name: 'selectedDirection',
@@ -537,6 +549,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
             { title: `Keyway → ${providerName}`, value: 'push' },
             { title: `${providerName} → Keyway`, value: 'pull' },
           ],
+          initial: defaultDirection,
         });
 
         if (!selectedDirection) {
