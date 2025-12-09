@@ -307,3 +307,146 @@ describe('SyncDiff type validation', () => {
     expect(Array.isArray(result.same)).toBe(true);
   });
 });
+
+describe('getSyncDiff with serviceId (Railway)', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('should include serviceId in URL when provided', async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({
+      keywayCount: 5,
+      providerCount: 10,
+      onlyInKeyway: [],
+      onlyInProvider: ['API_KEY', 'DB_URL'],
+      different: [],
+      same: ['NODE_ENV'],
+    }));
+
+    const { getSyncDiff } = await import('../src/utils/api.js');
+
+    await getSyncDiff('token', 'owner/repo', {
+      connectionId: 'conn-id',
+      projectId: 'proj-id',
+      serviceId: 'service-uuid-123',
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('serviceId=service-uuid-123');
+  });
+
+  it('should not include serviceId when not provided', async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({
+      keywayCount: 0,
+      providerCount: 0,
+      onlyInKeyway: [],
+      onlyInProvider: [],
+      different: [],
+      same: [],
+    }));
+
+    const { getSyncDiff } = await import('../src/utils/api.js');
+
+    await getSyncDiff('token', 'owner/repo', {
+      connectionId: 'conn-id',
+      projectId: 'proj-id',
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).not.toContain('serviceId');
+  });
+});
+
+describe('getSyncPreview with serviceId (Railway)', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it('should include serviceId in URL when provided', async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({
+      direction: 'pull',
+      toAdd: ['API_KEY', 'DB_URL'],
+      toUpdate: [],
+      toDelete: [],
+      unchanged: ['NODE_ENV'],
+    }));
+
+    const { getSyncPreview } = await import('../src/utils/api.js');
+
+    await getSyncPreview('token', 'owner/repo', {
+      connectionId: 'conn-id',
+      projectId: 'proj-id',
+      serviceId: 'service-uuid-456',
+      direction: 'pull',
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toContain('serviceId=service-uuid-456');
+    expect(url).toContain('direction=pull');
+  });
+
+  it('should not include serviceId when not provided', async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({
+      direction: 'push',
+      toAdd: [],
+      toUpdate: [],
+      toDelete: [],
+      unchanged: [],
+    }));
+
+    const { getSyncPreview } = await import('../src/utils/api.js');
+
+    await getSyncPreview('token', 'owner/repo', {
+      connectionId: 'conn-id',
+      projectId: 'proj-id',
+    });
+
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).not.toContain('serviceId');
+  });
+
+  it('should use correct endpoint with all parameters', async () => {
+    mockFetch.mockResolvedValueOnce(createMockResponse({
+      direction: 'pull',
+      toAdd: ['SECRET1', 'SECRET2'],
+      toUpdate: ['SECRET3'],
+      toDelete: [],
+      unchanged: ['SECRET4'],
+    }));
+
+    const { getSyncPreview } = await import('../src/utils/api.js');
+
+    const result = await getSyncPreview('token', 'owner/repo', {
+      connectionId: 'conn-uuid',
+      projectId: 'proj-uuid',
+      serviceId: 'svc-uuid',
+      keywayEnvironment: 'staging',
+      providerEnvironment: 'production',
+      direction: 'pull',
+      allowDelete: true,
+    });
+
+    const [url, options] = mockFetch.mock.calls[0];
+
+    expect(url).toContain('/v1/integrations/vaults/owner/repo/sync/preview');
+    expect(url).toContain('connectionId=conn-uuid');
+    expect(url).toContain('projectId=proj-uuid');
+    expect(url).toContain('serviceId=svc-uuid');
+    expect(url).toContain('keywayEnvironment=staging');
+    expect(url).toContain('providerEnvironment=production');
+    expect(url).toContain('direction=pull');
+    expect(url).toContain('allowDelete=true');
+    expect(options.headers.Authorization).toBe('Bearer token');
+
+    expect(result.toAdd).toEqual(['SECRET1', 'SECRET2']);
+    expect(result.toUpdate).toEqual(['SECRET3']);
+  });
+});
