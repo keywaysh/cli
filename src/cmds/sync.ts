@@ -513,6 +513,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         const diff = await getSyncDiff(accessToken, repoFullName, {
           connectionId: connection.id,
           projectId: selectedProject.id,
+          serviceId: selectedProject.serviceId, // Railway: service ID for service-specific variables
           keywayEnvironment: effectiveKeywayEnv,
           providerEnvironment: effectiveProviderEnv,
         });
@@ -701,6 +702,7 @@ async function executeSyncOperation(
   const result = await executeSync(accessToken, repoFullName, {
     connectionId,
     projectId: project.id,
+    serviceId: project.serviceId, // Railway: service ID for service-specific variables
     keywayEnvironment: keywayEnv,
     providerEnvironment: providerEnv,
     direction,

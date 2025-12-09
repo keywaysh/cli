@@ -443,6 +443,7 @@ export async function getSyncDiff(
   options: {
     connectionId: string;
     projectId: string;
+    serviceId?: string; // Railway: service ID for service-specific variables
     keywayEnvironment?: string;
     providerEnvironment?: string;
   }
@@ -454,6 +455,9 @@ export async function getSyncDiff(
     keywayEnvironment: options.keywayEnvironment || 'production',
     providerEnvironment: options.providerEnvironment || 'production',
   });
+  if (options.serviceId) {
+    params.set('serviceId', options.serviceId);
+  }
 
   // Use longer timeout as it fetches secrets from both sides
   const response = await fetchWithTimeout(
@@ -481,6 +485,7 @@ export async function getSyncPreview(
   options: {
     connectionId: string;
     projectId: string;
+    serviceId?: string; // Railway: service ID for service-specific variables
     keywayEnvironment?: string;
     providerEnvironment?: string;
     direction?: 'push' | 'pull';
@@ -496,6 +501,9 @@ export async function getSyncPreview(
     direction: options.direction || 'push',
     allowDelete: String(options.allowDelete || false),
   });
+  if (options.serviceId) {
+    params.set('serviceId', options.serviceId);
+  }
 
   // Use longer timeout for sync preview as it may involve many secrets
   const response = await fetchWithTimeout(
@@ -524,6 +532,7 @@ export async function executeSync(
   options: {
     connectionId: string;
     projectId: string;
+    serviceId?: string; // Railway: service ID for service-specific variables
     keywayEnvironment?: string;
     providerEnvironment?: string;
     direction?: 'push' | 'pull';
@@ -545,6 +554,7 @@ export async function executeSync(
       body: JSON.stringify({
         connectionId: options.connectionId,
         projectId: options.projectId,
+        serviceId: options.serviceId,
         keywayEnvironment: options.keywayEnvironment || 'production',
         providerEnvironment: options.providerEnvironment || 'production',
         direction: options.direction || 'push',
