@@ -75,6 +75,7 @@ export interface ConnectionInfo {
 export interface ProviderProject {
   id: string;
   name: string;
+  serviceId?: string; // For Railway: service ID to sync with
   serviceName?: string; // For Railway: service name (more meaningful than project name)
   framework?: string;
   linkedRepo?: string; // GitHub repo linked to this project (e.g., "owner/repo")
