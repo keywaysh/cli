@@ -633,7 +633,7 @@ async function executeSyncOperation(
   accessToken: string,
   repoFullName: string,
   connectionId: string,
-  project: { id: string; name: string },
+  project: { id: string; name: string; serviceId?: string },
   keywayEnv: string,
   providerEnv: string,
   direction: 'push' | 'pull',
@@ -647,6 +647,7 @@ async function executeSyncOperation(
   const preview = await getSyncPreview(accessToken, repoFullName, {
     connectionId,
     projectId: project.id,
+    serviceId: project.serviceId, // Railway: service ID for service-specific variables
     keywayEnvironment: keywayEnv,
     providerEnvironment: providerEnv,
     direction,
