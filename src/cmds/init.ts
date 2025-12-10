@@ -60,22 +60,22 @@ async function ensureLoginAndGitHubApp(
     // Token was invalid (401), fall through to unified login flow below
   }
 
-  // User is NOT logged in - use unified flow
+  // User is NOT logged in
   const allowPrompt = options.allowPrompt !== false;
   if (!allowPrompt || !isInteractive()) {
     throw new Error('No Keyway session found. Run "keyway login" to authenticate.');
   }
 
-  // Prompt for unified flow
-  console.log('');
-  console.log(pc.gray('  Keyway uses a GitHub App for secure access.'));
-  console.log(pc.gray('  Installing the app will also log you in.'));
-  console.log('');
+  // Start device flow
+  const deviceStart = await startDeviceLogin(repoFullName);
+  const installUrl = deviceStart.githubAppInstallUrl || 'https://github.com/apps/keyway/installations/new';
 
+  // Prompt user
+  console.log('');
   const { shouldProceed } = await prompts({
     type: 'confirm',
     name: 'shouldProceed',
-    message: 'Open browser to install Keyway & sign in?',
+    message: 'Open browser to sign in?',
     initial: true,
   });
 
@@ -83,19 +83,12 @@ async function ensureLoginAndGitHubApp(
     throw new Error('Setup required. Run "keyway init" when ready.');
   }
 
-  // Start device flow for login (this creates the device code before opening browser)
-  const deviceStart = await startDeviceLogin(repoFullName);
-
-  // Get install URL from API response (allows different URLs per environment)
-  const installUrl = deviceStart.githubAppInstallUrl || 'https://github.com/apps/keyway/installations/new';
-
-  // Open browser to GitHub App installation page
-  // User will authorize the app AND log in during installation
-  await openUrl(installUrl);
-  console.log(pc.blue('⏳ Waiting for installation & authorization...'));
+  // ALWAYS use verification URL for auth (device flow standard)
+  await openUrl(deviceStart.verificationUriComplete);
+  console.log(pc.blue('⏳ Waiting for authorization...'));
   console.log(pc.gray('   (Press Ctrl+C to cancel)\n'));
 
-  // Poll for both login AND installation
+  // STEP 1: Poll for login
   const pollIntervalMs = Math.max((deviceStart.interval ?? 5) * 1000, POLL_INTERVAL_MS);
   const startTime = Date.now();
   let accessToken: string | null = null;
@@ -105,52 +98,102 @@ async function ensureLoginAndGitHubApp(
     await sleep(pollIntervalMs);
 
     try {
-      // Poll device login first
-      if (!accessToken) {
-        const result = await pollDeviceLogin(deviceStart.deviceCode);
-        if (result.status === 'approved' && result.keywayToken) {
-          accessToken = result.keywayToken;
-          await saveAuthToken(result.keywayToken, {
-            githubLogin: result.githubLogin,
-            expiresAt: result.expiresAt,
+      const result = await pollDeviceLogin(deviceStart.deviceCode);
+      if (result.status === 'approved' && result.keywayToken) {
+        accessToken = result.keywayToken;
+        await saveAuthToken(result.keywayToken, {
+          githubLogin: result.githubLogin,
+          expiresAt: result.expiresAt,
+        });
+        console.log(pc.green('✓ Signed in!'));
+        if (result.githubLogin) {
+          identifyUser(result.githubLogin, {
+            github_username: result.githubLogin,
+            login_method: 'device_flow',
           });
-          console.log(pc.green('✓ Signed in!'));
-          if (result.githubLogin) {
-            identifyUser(result.githubLogin, {
-              github_username: result.githubLogin,
-              login_method: 'github_app',
-            });
-          }
         }
+        break;
       }
-
-      // If we have a token, check GitHub App installation
-      if (accessToken) {
-        const installStatus = await checkGitHubAppInstallation(repoOwner, repoName, accessToken);
-        if (installStatus.installed) {
-          console.log(pc.green('✓ GitHub App installed!'));
-          console.log('');
-          return accessToken;
-        }
-      }
-
-      consecutiveErrors = 0; // Reset on any successful API call
+      consecutiveErrors = 0;
       process.stdout.write(pc.gray('.'));
     } catch (error) {
       consecutiveErrors++;
       if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-        throw new Error(`Setup failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
+        throw new Error(`Login failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
       }
-      // Continue polling on transient errors
+    }
+  }
+
+  if (!accessToken) {
+    console.log('');
+    console.log(pc.yellow('⚠ Timed out waiting for sign in.'));
+    throw new Error('Sign in timed out. Please try again.');
+  }
+
+  // STEP 2: Check installation now that we're authenticated
+  const installStatus = await checkGitHubAppInstallation(repoOwner, repoName, accessToken);
+  if (installStatus.installed) {
+    console.log(pc.green('✓ GitHub App installed'));
+    console.log('');
+    return accessToken;
+  }
+
+  // App not installed - ask user to install
+  console.log('');
+  console.log(pc.yellow('⚠ GitHub App not installed on this repository'));
+  console.log(pc.gray('  The Keyway GitHub App is required for secure access.'));
+  console.log('');
+
+  const { shouldInstall } = await prompts({
+    type: 'confirm',
+    name: 'shouldInstall',
+    message: 'Open browser to install GitHub App?',
+    initial: true,
+  });
+
+  if (!shouldInstall) {
+    console.log(pc.gray(`\n  Install later: ${installUrl}`));
+    throw new Error('GitHub App installation required.');
+  }
+
+  // Open installation page
+  await openUrl(installUrl);
+  console.log(pc.blue('⏳ Waiting for GitHub App installation...'));
+  console.log(pc.gray('   Add this repository and click "Install"'));
+  console.log(pc.gray('   Then return here - the CLI will detect it automatically'));
+  console.log(pc.gray('   (Press Ctrl+C to cancel)\n'));
+
+  // STEP 3: Poll for installation
+  const installStartTime = Date.now();
+  consecutiveErrors = 0;
+
+  while (Date.now() - installStartTime < POLL_TIMEOUT_MS) {
+    await sleep(POLL_INTERVAL_MS);
+
+    try {
+      const pollStatus = await checkGitHubAppInstallation(repoOwner, repoName, accessToken);
+      if (pollStatus.installed) {
+        console.log(pc.green('✓ GitHub App installed!'));
+        console.log('');
+        return accessToken;
+      }
+      consecutiveErrors = 0;
+      process.stdout.write(pc.gray('.'));
+    } catch (error) {
+      consecutiveErrors++;
+      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        throw new Error(`Installation check failed after ${MAX_CONSECUTIVE_ERRORS} consecutive errors: ${errorMsg}`);
+      }
     }
   }
 
   // Timeout
   console.log('');
-  console.log(pc.yellow('⚠ Timed out waiting for setup.'));
+  console.log(pc.yellow('⚠ Timed out waiting for installation.'));
   console.log(pc.gray(`  Install the GitHub App: ${installUrl}`));
-  throw new Error('Setup timed out. Please try again.');
+  throw new Error('GitHub App installation timed out.');
 }
 
 /**

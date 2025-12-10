@@ -656,7 +656,7 @@ export interface GitHubAppInstallationStatus {
 }
 
 /**
- * Check if GitHub App is installed for a repository
+ * Check if GitHub App is installed for a repository (authenticated)
  */
 export async function checkGitHubAppInstallation(
   repoOwner: string,
@@ -676,3 +676,4 @@ export async function checkGitHubAppInstallation(
   const wrapped = await handleResponse<{ data: GitHubAppInstallationStatus }>(response);
   return wrapped.data;
 }
+
