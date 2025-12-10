@@ -9,6 +9,8 @@ import {
   executeSync,
   truncateMessage,
   getVaultEnvironments,
+  checkVaultExists,
+  initVault,
 } from '../utils/api.js';
 import type { SyncDiff } from '../types.js';
 
@@ -39,6 +41,20 @@ export function mapToRailwayEnvironment(keywayEnv: string): string {
 }
 
 /**
+ * Map Keyway environment to Netlify environment (contexts)
+ */
+export function mapToNetlifyEnvironment(keywayEnv: string): string {
+  const mapping: Record<string, string> = {
+    production: 'production',
+    staging: 'branch-deploy',
+    preview: 'deploy-preview',
+    dev: 'dev',
+    development: 'dev',
+  };
+  return mapping[keywayEnv.toLowerCase()] || 'production';
+}
+
+/**
  * Map Keyway environment to provider environment
  */
 function mapToProviderEnvironment(provider: string, keywayEnv: string): string {
@@ -47,6 +63,8 @@ function mapToProviderEnvironment(provider: string, keywayEnv: string): string {
       return mapToVercelEnvironment(keywayEnv);
     case 'railway':
       return mapToRailwayEnvironment(keywayEnv);
+    case 'netlify':
+      return mapToNetlifyEnvironment(keywayEnv);
     default:
       return keywayEnv;
   }
@@ -263,6 +281,36 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     }
 
     console.log(pc.gray(`Repository: ${repoFullName}`));
+
+    // Check if vault exists
+    const vaultExists = await checkVaultExists(accessToken, repoFullName);
+    if (!vaultExists) {
+      console.log(pc.yellow(`\nNo vault found for ${repoFullName}.`));
+
+      const { shouldCreate } = await prompts({
+        type: 'confirm',
+        name: 'shouldCreate',
+        message: 'Create vault now?',
+        initial: true,
+      });
+
+      if (!shouldCreate) {
+        console.log(pc.gray('Cancelled. Run `keyway init` to create a vault first.'));
+        process.exit(0);
+      }
+
+      // Create vault
+      console.log(pc.gray('\nCreating vault...'));
+
+      try {
+        await initVault(repoFullName, accessToken);
+        console.log(pc.green(`✓ Vault created for ${repoFullName}\n`));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to create vault';
+        console.error(pc.red(`\n✗ ${message}`));
+        process.exit(1);
+      }
+    }
 
     // Get provider connection
     let { connections } = await getConnections(accessToken);

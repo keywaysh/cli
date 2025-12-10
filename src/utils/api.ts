@@ -375,10 +375,12 @@ export async function deleteConnection(accessToken: string, connectionId: string
 
 /**
  * Get OAuth authorization URL for a provider
+ * Token passed as query param since browser can't send Authorization header
  */
-export function getProviderAuthUrl(provider: string, redirectUri?: string): string {
-  const params = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
-  return `${API_BASE_URL}/v1/integrations/${provider}/authorize${params}`;
+export function getProviderAuthUrl(provider: string, accessToken: string, redirectUri?: string): string {
+  const params = new URLSearchParams({ token: accessToken });
+  if (redirectUri) params.set('redirect_uri', redirectUri);
+  return `${API_BASE_URL}/v1/integrations/${provider}/authorize?${params}`;
 }
 
 /**

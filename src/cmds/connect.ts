@@ -83,7 +83,7 @@ async function connectWithOAuthFlow(
   provider: string,
   displayName: string
 ): Promise<boolean> {
-  const authUrl = getProviderAuthUrl(provider);
+  const authUrl = getProviderAuthUrl(provider, accessToken);
   const startTime = new Date();
 
   await openUrl(authUrl);
