@@ -27,7 +27,6 @@ const showBanner = () => {
 };
 
 showBanner();
-warnIfEnvNotGitignored();
 
 program
   .name('keyway')
@@ -128,7 +127,10 @@ program
     await syncCommand(provider, options);
   });
 
-program.parseAsync().catch((error) => {
+(async () => {
+  await warnIfEnvNotGitignored();
+  await program.parseAsync();
+})().catch((error) => {
   console.error(pc.red('Error:'), error.message || error);
   process.exit(1);
 });

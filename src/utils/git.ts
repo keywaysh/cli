@@ -2,6 +2,7 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import pc from 'picocolors';
+import prompts from 'prompts';
 
 export function getCurrentRepoFullName(): string {
   try {
@@ -93,10 +94,57 @@ export function checkEnvGitignore(): boolean {
 }
 
 /**
- * Print warning if .env files are not gitignored
+ * Add .env to .gitignore file
  */
-export function warnIfEnvNotGitignored(): void {
-  if (!checkEnvGitignore()) {
-    console.log(pc.yellow('⚠️  .env files are not in .gitignore - secrets may be committed'));
+export function addEnvToGitignore(): boolean {
+  try {
+    const gitRoot = execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+    }).trim();
+
+    const gitignorePath = path.join(gitRoot, '.gitignore');
+    const envEntry = '.env*';
+
+    if (fs.existsSync(gitignorePath)) {
+      const content = fs.readFileSync(gitignorePath, 'utf-8');
+      // Add with newline if file doesn't end with one
+      const newContent = content.endsWith('\n')
+        ? `${content}${envEntry}\n`
+        : `${content}\n${envEntry}\n`;
+      fs.writeFileSync(gitignorePath, newContent);
+    } else {
+      fs.writeFileSync(gitignorePath, `${envEntry}\n`);
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Warn if .env files are not gitignored and offer to add them
+ */
+export async function warnIfEnvNotGitignored(): Promise<void> {
+  if (checkEnvGitignore()) {
+    return;
+  }
+
+  console.log(pc.yellow('⚠️  .env files are not in .gitignore - secrets may be committed'));
+
+  const { addToGitignore } = await prompts({
+    type: 'confirm',
+    name: 'addToGitignore',
+    message: 'Add .env* to .gitignore?',
+    initial: true,
+  });
+
+  if (addToGitignore) {
+    if (addEnvToGitignore()) {
+      console.log(pc.green('✓ Added .env* to .gitignore'));
+    } else {
+      console.log(pc.red('✗ Failed to update .gitignore'));
+    }
   }
 }

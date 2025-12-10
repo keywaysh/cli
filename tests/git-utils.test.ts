@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import { execSync } from 'child_process';
-import { checkEnvGitignore } from '../src/utils/git.js';
+import { checkEnvGitignore, addEnvToGitignore } from '../src/utils/git.js';
 
 vi.mock('child_process');
 vi.mock('fs');
@@ -87,5 +87,83 @@ describe('checkEnvGitignore', () => {
     vi.mocked(fs.readFileSync).mockReturnValue('  .env  \n');
 
     expect(checkEnvGitignore()).toBe(true);
+  });
+});
+
+describe('addEnvToGitignore', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should add .env* to existing gitignore file', () => {
+    vi.mocked(execSync).mockReturnValue('/some/repo\n');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('node_modules\ndist\n');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+
+    const result = addEnvToGitignore();
+
+    expect(result).toBe(true);
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/some/repo/.gitignore',
+      'node_modules\ndist\n.env*\n'
+    );
+  });
+
+  it('should add .env* with newline when file does not end with newline', () => {
+    vi.mocked(execSync).mockReturnValue('/some/repo\n');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('node_modules\ndist');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+
+    const result = addEnvToGitignore();
+
+    expect(result).toBe(true);
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/some/repo/.gitignore',
+      'node_modules\ndist\n.env*\n'
+    );
+  });
+
+  it('should create gitignore file if it does not exist', () => {
+    vi.mocked(execSync).mockReturnValue('/some/repo\n');
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+
+    const result = addEnvToGitignore();
+
+    expect(result).toBe(true);
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      '/some/repo/.gitignore',
+      '.env*\n'
+    );
+  });
+
+  it('should return false when not in a git repository', () => {
+    vi.mocked(execSync).mockImplementation(() => {
+      throw new Error('Not a git repository');
+    });
+
+    const result = addEnvToGitignore();
+
+    expect(result).toBe(false);
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it('should return false when writeFileSync fails', () => {
+    vi.mocked(execSync).mockReturnValue('/some/repo\n');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue('node_modules\n');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      throw new Error('Permission denied');
+    });
+
+    const result = addEnvToGitignore();
+
+    expect(result).toBe(false);
   });
 });
