@@ -158,6 +158,25 @@ Clear stored Keyway credentials.
 keyway logout
 ```
 
+### `keyway sync`
+
+**One command to deploy your secrets everywhere.**
+
+Sync your vault to Vercel, Netlify, and more. No more copy-pasting environment variables between dashboards.
+
+```bash
+keyway sync vercel
+keyway sync netlify
+keyway sync railway
+```
+
+The CLI handles everything:
+1. OAuth connection (first time only)
+2. Project auto-detection
+3. Smart diff (only updates what changed)
+
+Your local `.env`, Vercel, Netlify, Railway — all in sync with one command.
+
 ## Security
 
 Keyway is designed to be **simple and secure** — a major upgrade from Slack or Notion, without the complexity of Hashicorp Vault or AWS Secrets Manager.

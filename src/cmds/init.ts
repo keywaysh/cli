@@ -8,6 +8,7 @@ import { discoverEnvCandidates, pushCommand } from './push.js';
 import { getStoredAuth, saveAuthToken } from '../utils/auth.js';
 import { pollDeviceLogin, startDeviceLogin } from '../utils/api.js';
 import { sleep, isInteractive, MAX_CONSECUTIVE_ERRORS, openUrl, showUpgradePrompt } from '../utils/helpers.js';
+import { promptCreateEnvFile } from '../utils/env.js';
 
 const DASHBOARD_URL = 'https://www.keyway.sh/dashboard/vaults';
 const POLL_INTERVAL_MS = 3000;
@@ -355,8 +356,17 @@ export async function initCommand(options: InitOptions = {}) {
     console.log('');
 
     if (envCandidates.length === 0) {
-      console.log(`${pc.yellow('⚠')} No .env file found - your vault is empty`);
-      console.log(`  Next: Create ${pc.cyan('.env')} and run ${pc.cyan('keyway push')}\n`);
+      if (isInteractive) {
+        const created = await promptCreateEnvFile();
+        if (created) {
+          console.log(`  Add your variables and run ${pc.cyan('keyway push')}\n`);
+        } else {
+          console.log(`  Next: Create ${pc.cyan('.env')} and run ${pc.cyan('keyway push')}\n`);
+        }
+      } else {
+        console.log(`${pc.yellow('⚠')} No .env file found - your vault is empty`);
+        console.log(`  Next: Create ${pc.cyan('.env')} and run ${pc.cyan('keyway push')}\n`);
+      }
     } else {
       console.log(`  ${pc.yellow('→')} Run ${pc.cyan('keyway push')} to sync your secrets\n`);
     }

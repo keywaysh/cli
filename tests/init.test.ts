@@ -398,15 +398,16 @@ describe('initCommand', () => {
   });
 
   describe('empty vault warning', () => {
-    it('should show warning when no .env file is found', async () => {
+    it('should show next steps when no .env file is found', async () => {
       mockDiscoverEnvCandidates.mockReturnValue([]);
 
       const { initCommand } = await import('../src/cmds/init.js');
 
       await initCommand({});
 
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('No .env file found'));
-      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('vault is empty'));
+      // In non-interactive mode, shows next steps message
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('Next:'));
+      expect(mockConsoleLog).toHaveBeenCalledWith(expect.stringContaining('keyway push'));
     });
 
     it('should not show empty vault warning when .env files exist', async () => {

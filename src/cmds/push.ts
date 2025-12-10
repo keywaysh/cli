@@ -7,6 +7,7 @@ import { APIError, pushSecrets, truncateMessage } from '../utils/api.js';
 import { trackEvent, AnalyticsEvents, shutdownAnalytics } from '../utils/analytics.js';
 import { ensureLogin } from './login.js';
 import { showUpgradePrompt } from '../utils/helpers.js';
+import { promptCreateEnvFile } from '../utils/env.js';
 
 export function deriveEnvFromFile(file: string): string {
   const base = path.basename(file);
@@ -70,9 +71,19 @@ export async function pushCommand(options: PushOptions) {
 
     const candidates = discoverEnvCandidates(process.cwd());
 
-    // If no env files found and no explicit --file provided, fail early
+    // If no env files found and no explicit --file provided, offer to create one
     if (candidates.length === 0 && !envFile) {
-      throw new Error('No .env file found. Create a .env file first, or use --file <path> to specify one.');
+      if (!isInteractive) {
+        throw new Error('No .env file found. Create a .env file first, or use --file <path> to specify one.');
+      }
+
+      const created = await promptCreateEnvFile();
+      if (!created) {
+        throw new Error('No .env file found.');
+      }
+
+      console.log(pc.gray('  Add your variables and run keyway push again\n'));
+      return;
     }
 
     // If env provided but file not, try to match a discovered file
