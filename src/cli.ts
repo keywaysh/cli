@@ -7,6 +7,7 @@ import { pushCommand } from './cmds/push.js';
 import { pullCommand } from './cmds/pull.js';
 import { loginCommand, logoutCommand } from './cmds/login.js';
 import { doctorCommand } from './cmds/doctor.js';
+import { ciSetupCommand } from './cmds/ci.js';
 import { connectCommand, connectionsCommand, disconnectCommand } from './cmds/connect.js';
 import { syncCommand } from './cmds/sync.js';
 import { warnIfEnvNotGitignored } from './utils/git.js';
@@ -125,6 +126,16 @@ program
   .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')
   .action(async (provider, options) => {
     await syncCommand(provider, options);
+  });
+
+// CI/CD integration
+const ci = program.command('ci').description('CI/CD integration commands');
+
+ci.command('setup')
+  .description('Setup GitHub Actions integration (adds KEYWAY_TOKEN secret)')
+  .option('--repo <repo>', 'Repository in owner/repo format (auto-detected)')
+  .action(async (options) => {
+    await ciSetupCommand(options);
   });
 
 (async () => {
