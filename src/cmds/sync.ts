@@ -220,12 +220,63 @@ export function projectMatchesRepo(
 }
 
 /**
+ * Select a project with option to connect new account
+ * Loops until user selects a project or cancels
+ */
+async function selectProjectWithConnectOption(
+  accessToken: string,
+  provider: string,
+  providerDisplayName: string,
+  repoFullName: string,
+  initialProjects: ProjectWithLinkedRepo[]
+): Promise<{ project: ProjectWithLinkedRepo; projects: ProjectWithLinkedRepo[] }> {
+  let projects = initialProjects;
+
+  while (true) {
+    const result = await promptProjectSelection(projects, repoFullName, providerDisplayName);
+
+    if (result === 'connect_new') {
+      // Connect new account
+      console.log('');
+      await connectCommand(provider, { loginPrompt: false });
+      console.log('');
+
+      // Refresh projects from all connections
+      const { projects: allProjects } = await getAllProviderProjects(accessToken, provider.toLowerCase());
+      projects = allProjects.map(p => ({
+        id: p.id,
+        name: p.name,
+        serviceId: p.serviceId,
+        serviceName: p.serviceName,
+        linkedRepo: p.linkedRepo,
+        environments: p.environments,
+        connectionId: p.connectionId,
+        teamId: p.teamId,
+        teamName: p.teamName,
+      }));
+
+      if (projects.length === 0) {
+        console.error(pc.red(`No projects found after connecting.`));
+        process.exit(1);
+      }
+
+      console.log(pc.green(`Found ${projects.length} projects. Select one:\n`));
+      continue;
+    }
+
+    return { project: result, projects };
+  }
+}
+
+/**
  * Prompt user to select a project from list
+ * Returns 'connect_new' if user chooses to connect another account
  */
 async function promptProjectSelection(
   projects: ProjectWithLinkedRepo[],
-  repoFullName: string
-): Promise<ProjectWithLinkedRepo> {
+  repoFullName: string,
+  providerDisplayName: string
+): Promise<ProjectWithLinkedRepo | 'connect_new'> {
   const repoName = repoFullName.split('/')[1]?.toLowerCase() || '';
 
   // Check if we have multiple accounts/teams
@@ -233,7 +284,7 @@ async function promptProjectSelection(
   const hasMultipleAccounts = uniqueTeams.size > 1;
 
   // Build choices with helpful labels
-  const choices = projects.map(p => {
+  const choices: Array<{ title: string; value: string }> = projects.map(p => {
     const displayName = getProjectDisplayName(p);
     let title = displayName;
     const badges: string[] = [];
@@ -267,6 +318,12 @@ async function promptProjectSelection(
     return { title, value: p.id };
   });
 
+  // Add option to connect another account
+  choices.push({
+    title: pc.blue(`+ Connect another ${providerDisplayName} account`),
+    value: '__connect_new__',
+  });
+
   const { projectChoice } = await prompts({
     type: 'select',
     name: 'projectChoice',
@@ -277,6 +334,10 @@ async function promptProjectSelection(
   if (!projectChoice) {
     console.log(pc.gray('Cancelled.'));
     process.exit(0);
+  }
+
+  if (projectChoice === '__connect_new__') {
+    return 'connect_new';
   }
 
   return projects.find(p => p.id === projectChoice)!;
@@ -489,7 +550,9 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         if (useDetected) {
           selectedProject = autoMatch.project;
         } else {
-          selectedProject = await promptProjectSelection(projects, repoFullName);
+          const result = await selectProjectWithConnectOption(accessToken, provider, providerDisplayName, repoFullName, projects);
+          selectedProject = result.project;
+          projects = result.projects;
         }
       } else if (projects.length === 1) {
         // Only one project - use it but warn if it doesn't match
@@ -522,7 +585,9 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         // No match found - show list with warning
         console.log(pc.yellow(`\n⚠️  No matching project found for ${repoFullName}`));
         console.log(pc.gray('Select a project manually:\n'));
-        selectedProject = await promptProjectSelection(projects, repoFullName);
+        const result = await selectProjectWithConnectOption(accessToken, provider, providerDisplayName, repoFullName, projects);
+        selectedProject = result.project;
+        projects = result.projects;
       }
     }
 
