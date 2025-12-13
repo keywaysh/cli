@@ -82,6 +82,24 @@ export interface ProviderProject {
   environments?: string[]; // Available environments in the project (for Railway)
 }
 
+/**
+ * Project with connection info for multi-account support
+ * Used when fetching projects from ALL connections
+ */
+export interface ProjectWithConnection extends ProviderProject {
+  connectionId: string;
+  teamId: string | null;
+  teamName?: string;
+}
+
+/**
+ * Response from getAllProviderProjects
+ */
+export interface AllProviderProjectsResponse {
+  projects: ProjectWithConnection[];
+  connections: ConnectionInfo[];
+}
+
 export interface SyncStatusInfo {
   isFirstSync: boolean;
   vaultIsEmpty: boolean;

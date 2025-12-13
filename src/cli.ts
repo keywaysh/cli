@@ -121,6 +121,7 @@ program
   .option('-e, --environment <env>', 'Keyway environment (default: production)')
   .option('--provider-env <env>', 'Provider environment (default: production)')
   .option('--project <project>', 'Provider project name or ID')
+  .option('--team <team>', 'Team/org name or ID (for multi-account)')
   .option('--allow-delete', 'Allow deleting secrets not in source')
   .option('-y, --yes', 'Skip confirmation prompt')
   .option('--no-login-prompt', 'Fail instead of prompting to login if unauthenticated')

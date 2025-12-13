@@ -3,6 +3,7 @@ import prompts from 'prompts';
 import {
   getConnections,
   getConnectionProjects,
+  getAllProviderProjects,
   getSyncStatus,
   getSyncDiff,
   getSyncPreview,
@@ -12,7 +13,7 @@ import {
   checkVaultExists,
   initVault,
 } from '../utils/api.js';
-import type { SyncDiff } from '../types.js';
+import type { SyncDiff, ProjectWithConnection, ConnectionInfo } from '../types.js';
 
 /**
  * Map Keyway environment to Vercel environment
@@ -125,6 +126,7 @@ interface SyncOptions {
   environment?: string;
   providerEnv?: string;
   project?: string;
+  team?: string; // Team/org name or ID for multi-account
   allowDelete?: boolean;
   yes?: boolean;
   loginPrompt?: boolean;
@@ -133,9 +135,14 @@ interface SyncOptions {
 export interface ProjectWithLinkedRepo {
   id: string;
   name: string;
+  serviceId?: string; // For Railway: service ID to sync with
   serviceName?: string; // For Railway: the service name (more meaningful than project name)
   linkedRepo?: string;
   environments?: string[]; // Available environments in the provider project
+  // Multi-account support
+  connectionId?: string;
+  teamId?: string | null;
+  teamName?: string;
 }
 
 export interface ProjectMatch {
@@ -221,11 +228,28 @@ async function promptProjectSelection(
 ): Promise<ProjectWithLinkedRepo> {
   const repoName = repoFullName.split('/')[1]?.toLowerCase() || '';
 
+  // Check if we have multiple accounts/teams
+  const uniqueTeams = new Set(projects.map(p => p.teamId || 'personal'));
+  const hasMultipleAccounts = uniqueTeams.size > 1;
+
   // Build choices with helpful labels
   const choices = projects.map(p => {
     const displayName = getProjectDisplayName(p);
     let title = displayName;
     const badges: string[] = [];
+
+    // Add team/account info if multiple accounts
+    if (hasMultipleAccounts) {
+      if (p.teamName) {
+        badges.push(pc.cyan(`[${p.teamName}]`));
+      } else if (p.teamId) {
+        // Show truncated teamId if no teamName available
+        const shortTeamId = p.teamId.length > 12 ? p.teamId.slice(0, 12) + '...' : p.teamId;
+        badges.push(pc.cyan(`[team:${shortTeamId}]`));
+      } else {
+        badges.push(pc.cyan('[personal]'));
+      }
+    }
 
     // Add badges for matching projects
     if (p.linkedRepo?.toLowerCase() === repoFullName.toLowerCase()) {
@@ -312,12 +336,12 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       }
     }
 
-    // Get provider connection
-    let { connections } = await getConnections(accessToken);
-    let connection = connections.find(c => c.provider === provider.toLowerCase());
+    // Get all projects from all connections for this provider
+    const providerDisplayName = provider.charAt(0).toUpperCase() + provider.slice(1);
+    let { projects: allProjects, connections } = await getAllProviderProjects(accessToken, provider.toLowerCase());
 
-    if (!connection) {
-      const providerDisplayName = provider.charAt(0).toUpperCase() + provider.slice(1);
+    // If no connections exist, trigger connect flow
+    if (connections.length === 0) {
       console.log(pc.yellow(`\nNot connected to ${providerDisplayName}.`));
 
       const { shouldConnect } = await prompts({
@@ -335,12 +359,12 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       // Run connect flow
       await connectCommand(provider, { loginPrompt: false });
 
-      // Refresh connections
-      const refreshed = await getConnections(accessToken);
+      // Refresh projects from all connections
+      const refreshed = await getAllProviderProjects(accessToken, provider.toLowerCase());
+      allProjects = refreshed.projects;
       connections = refreshed.connections;
-      connection = connections.find(c => c.provider === provider.toLowerCase());
 
-      if (!connection) {
+      if (connections.length === 0) {
         console.error(pc.red(`\nConnection to ${providerDisplayName} failed.`));
         process.exit(1);
       }
@@ -348,12 +372,57 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
       console.log(''); // Spacing before continuing with sync
     }
 
-    // Get provider projects
-    const { projects } = await getConnectionProjects(accessToken, connection.id);
+    // Convert to ProjectWithLinkedRepo format (preserving connectionId)
+    let projects: ProjectWithLinkedRepo[] = allProjects.map(p => ({
+      id: p.id,
+      name: p.name,
+      serviceId: p.serviceId,
+      serviceName: p.serviceName,
+      linkedRepo: p.linkedRepo,
+      environments: p.environments,
+      connectionId: p.connectionId,
+      teamId: p.teamId,
+      teamName: p.teamName,
+    }));
+
+    // Filter by team if --team is specified
+    if (options.team) {
+      const teamFilter = options.team.toLowerCase();
+      const filteredProjects = projects.filter(p =>
+        p.teamId?.toLowerCase() === teamFilter ||
+        p.teamName?.toLowerCase() === teamFilter ||
+        // Match "personal" for null teamId
+        (teamFilter === 'personal' && !p.teamId)
+      );
+
+      if (filteredProjects.length === 0) {
+        console.error(pc.red(`No projects found for team: ${options.team}`));
+        console.log(pc.gray('Available teams:'));
+        const teams = new Set<string>();
+        projects.forEach(p => {
+          if (p.teamName) teams.add(p.teamName);
+          else if (p.teamId) teams.add(p.teamId);
+          else teams.add('personal');
+        });
+        teams.forEach(t => console.log(pc.gray(`  - ${t}`)));
+        process.exit(1);
+      }
+
+      projects = filteredProjects;
+      console.log(pc.gray(`Filtered to ${projects.length} projects in team: ${options.team}`));
+    }
 
     if (projects.length === 0) {
-      console.error(pc.red(`No projects found in your ${provider} account.`));
+      console.error(pc.red(`No projects found in your ${providerDisplayName} account(s).`));
+      if (connections.length > 1) {
+        console.log(pc.gray(`Checked ${connections.length} connected accounts.`));
+      }
       process.exit(1);
+    }
+
+    // For multi-account, show which accounts we're searching
+    if (connections.length > 1 && !options.team) {
+      console.log(pc.gray(`Searching ${projects.length} projects across ${connections.length} ${providerDisplayName} accounts...`));
     }
 
     // Select project
@@ -397,7 +466,15 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         const matchReason = autoMatch.matchType === 'linked_repo'
           ? `linked to ${repoFullName}`
           : 'exact name match';
-        console.log(pc.green(`✓ Auto-selected project: ${getProjectDisplayName(selectedProject)} (${matchReason})`));
+        // Show team info if available
+        let teamInfo = '';
+        if (selectedProject.teamName) {
+          teamInfo = pc.gray(` (${selectedProject.teamName})`);
+        } else if (selectedProject.teamId && connections.length > 1) {
+          const shortTeamId = selectedProject.teamId.length > 12 ? selectedProject.teamId.slice(0, 12) + '...' : selectedProject.teamId;
+          teamInfo = pc.gray(` (team:${shortTeamId})`);
+        }
+        console.log(pc.green(`✓ Auto-selected project: ${getProjectDisplayName(selectedProject)}${teamInfo} (${matchReason})`));
       } else if (autoMatch && autoMatch.matchType === 'partial_name') {
         // Partial match - ask for confirmation
         const partialDisplayName = getProjectDisplayName(autoMatch.project);
@@ -560,7 +637,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
 
         console.log(pc.gray('\nComparing secrets...'));
         diff = await getSyncDiff(accessToken, repoFullName, {
-          connectionId: connection.id,
+          connectionId: selectedProject.connectionId!,
           projectId: selectedProject.id,
           serviceId: selectedProject.serviceId, // Railway: service ID for service-specific variables
           keywayEnvironment: effectiveKeywayEnv,
@@ -618,7 +695,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     const status = await getSyncStatus(
       accessToken,
       repoFullName,
-      connection.id,
+      selectedProject.connectionId!,
       selectedProject.id,
       keywayEnv
     );
@@ -639,7 +716,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
         await executeSyncOperation(
           accessToken,
           repoFullName,
-          connection.id,
+          selectedProject.connectionId!,
           selectedProject,
           keywayEnv,
           providerEnv,
@@ -656,7 +733,7 @@ export async function syncCommand(provider: string, options: SyncOptions = {}) {
     await executeSyncOperation(
       accessToken,
       repoFullName,
-      connection.id,
+      selectedProject.connectionId!,
       selectedProject,
       keywayEnv,
       providerEnv,

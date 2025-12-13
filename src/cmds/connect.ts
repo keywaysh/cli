@@ -141,20 +141,31 @@ export async function connectCommand(provider: string, options: ConnectOptions =
       process.exit(1);
     }
 
-    // Check if already connected
+    // Check existing connections
     const { connections } = await getConnections(accessToken);
-    const existingConnection = connections.find(c => c.provider === provider.toLowerCase());
+    const existingConnections = connections.filter(c => c.provider === provider.toLowerCase());
 
-    if (existingConnection) {
-      const { reconnect } = await prompts({
-        type: 'confirm',
-        name: 'reconnect',
-        message: `You're already connected to ${providerInfo.displayName}. Reconnect?`,
-        initial: false,
+    if (existingConnections.length > 0) {
+      // Show existing connections
+      console.log(pc.gray(`\nYou have ${existingConnections.length} ${providerInfo.displayName} connection(s):`));
+      for (const conn of existingConnections) {
+        const teamInfo = conn.providerTeamId ? `(Team: ${conn.providerTeamId})` : '(Personal)';
+        console.log(pc.gray(`  - ${teamInfo}`));
+      }
+      console.log('');
+
+      const { action } = await prompts({
+        type: 'select',
+        name: 'action',
+        message: 'What would you like to do?',
+        choices: [
+          { title: 'Add another account/team', value: 'add' },
+          { title: 'Cancel', value: 'cancel' },
+        ],
       });
 
-      if (!reconnect) {
-        console.log(pc.gray('Keeping existing connection.'));
+      if (action !== 'add') {
+        console.log(pc.gray('Keeping existing connections.'));
         return;
       }
     }

@@ -10,6 +10,7 @@ import type {
   ProviderInfo,
   ConnectionInfo,
   ProviderProject,
+  ProjectWithConnection,
   SyncStatusInfo,
   SyncDiff,
   SyncPreview,
@@ -400,6 +401,27 @@ export async function getConnectionProjects(
 
   // Response uses wrapper format: { data: { projects }, meta: { requestId } }
   const wrapped = await handleResponse<{ data: { projects: ProviderProject[] } }>(response);
+  return wrapped.data;
+}
+
+/**
+ * Get projects from ALL connections for a provider
+ * Used for auto-detection when user has multiple accounts/teams
+ */
+export async function getAllProviderProjects(
+  accessToken: string,
+  provider: string
+): Promise<{ projects: ProjectWithConnection[]; connections: ConnectionInfo[] }> {
+  const response = await fetchWithTimeout(`${API_BASE_URL}/v1/integrations/providers/${provider}/all-projects`, {
+    method: 'GET',
+    headers: {
+      'User-Agent': USER_AGENT,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  // Response uses wrapper format: { data: { projects, connections }, meta: { requestId } }
+  const wrapped = await handleResponse<{ data: { projects: ProjectWithConnection[]; connections: ConnectionInfo[] } }>(response);
   return wrapped.data;
 }
 
