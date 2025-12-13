@@ -1,6 +1,6 @@
 {
   "name": "@keywaysh/cli",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "One link to all your secrets",
   "type": "module",
   "bin": {
