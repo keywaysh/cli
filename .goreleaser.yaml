@@ -25,6 +25,32 @@ builds:
       - -X main.commit={{.ShortCommit}}
       - -X main.date={{.Date}}
 
+# macOS code signing
+signs:
+  - cmd: codesign
+    args:
+      - "--force"
+      - "--options=runtime"
+      - "--sign"
+      - "{{ .Env.MACOS_SIGNING_IDENTITY }}"
+      - "--timestamp"
+      - "${artifact}"
+    artifacts: binary
+    ids:
+      - keyway
+    output: false
+
+# macOS notarization
+notarize:
+  macos:
+    - enabled: '{{ isEnvSet "AC_KEY_ID" }}'
+      sign:
+        certificate: "{{.Env.MACOS_SIGNING_IDENTITY}}"
+      notarize:
+        issuer_id: "{{.Env.AC_ISSUER_ID}}"
+        key_id: "{{.Env.AC_KEY_ID}}"
+        key: "~/private_keys/AuthKey_{{.Env.AC_KEY_ID}}.p8"
+
 archives:
   - id: default
     format: tar.gz
