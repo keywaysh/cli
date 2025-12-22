@@ -83,3 +83,21 @@ release:
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"
+
+brews:
+  - name: keyway
+    homepage: https://keyway.sh
+    description: "GitHub-native secrets management CLI"
+    license: "MIT"
+    repository:
+      owner: keywaysh
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    commit_author:
+      name: keywaysh-bot
+      email: bot@keyway.sh
+    directory: Formula
+    install: |
+      bin.install "keyway"
+    test: |
+      system "#{bin}/keyway", "--version"

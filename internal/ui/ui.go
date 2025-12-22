@@ -176,5 +176,5 @@ func DiffRemoved(key string) {
 
 // DiffKept displays a variable that will be kept (local only)
 func DiffKept(key string) {
-	dim.Printf("  • %s %s\n", key, "(local only, kept)")
+	dim.Printf("  • %s\n", key)
 }

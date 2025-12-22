@@ -117,21 +117,31 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	// Show diff if there are changes and file exists
 	if localExists && diff.hasChanges() {
-		ui.Message("")
-		ui.Message("Changes:")
-		for _, key := range diff.added {
-			ui.DiffAdded(key)
-		}
-		for _, key := range diff.changed {
-			ui.DiffChanged(key)
-		}
-		if !force {
-			for _, key := range diff.localOnly {
-				ui.DiffKept(key)
+		// Show vault changes (added/changed)
+		if len(diff.added) > 0 || len(diff.changed) > 0 {
+			ui.Message("")
+			ui.Message("Changes from vault:")
+			for _, key := range diff.added {
+				ui.DiffAdded(key)
 			}
-		} else {
-			for _, key := range diff.localOnly {
-				ui.DiffRemoved(key)
+			for _, key := range diff.changed {
+				ui.DiffChanged(key)
+			}
+		}
+
+		// Show local-only variables
+		if len(diff.localOnly) > 0 {
+			ui.Message("")
+			if !force {
+				ui.Message("Not in vault (will be preserved):")
+				for _, key := range diff.localOnly {
+					ui.DiffKept(key)
+				}
+			} else {
+				ui.Message("Not in vault (will be removed):")
+				for _, key := range diff.localOnly {
+					ui.DiffRemoved(key)
+				}
 			}
 		}
 		ui.Message("")
