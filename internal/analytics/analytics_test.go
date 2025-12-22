@@ -54,7 +54,7 @@ func TestSanitizeProperties_TruncatesLongStrings(t *testing.T) {
 	}
 
 	props := map[string]interface{}{
-		"longField": longString,
+		"longField":  longString,
 		"shortField": "short",
 	}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/keywaysh/cli/internal/analytics"
 	"github.com/keywaysh/cli/internal/api"
@@ -78,10 +79,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 	})
 
 	if err != nil {
-		analytics.Track(analytics.EventError, map[string]interface{}{
-			"command": "init",
-			"error":   err.Error(),
-		})
 		if apiErr, ok := err.(*api.APIError); ok {
 			// Already exists (409 Conflict)
 			if apiErr.StatusCode == 409 {
@@ -90,15 +87,62 @@ func runInit(cmd *cobra.Command, args []string) error {
 				ui.Outro(fmt.Sprintf("Dashboard: %s", ui.Link(dashboardURL+"/"+repo)))
 				return nil
 			}
+
+			// Check if trial is available (from structured error response)
+			if apiErr.StatusCode == 403 && apiErr.TrialInfo != nil && apiErr.TrialInfo.Eligible && ui.IsInteractive() {
+				trialInfo := apiErr.TrialInfo
+				ui.Warn("This repository belongs to an organization on the Free plan")
+				ui.Message(ui.Dim(fmt.Sprintf("Private organization repos require a Team plan, but you can start a %d-day free trial.", trialInfo.DaysAvailable)))
+
+				startTrial, _ := ui.Confirm(fmt.Sprintf("Start %d-day free trial for %s?", trialInfo.DaysAvailable, trialInfo.OrgLogin), true)
+				if startTrial {
+					var trialResult *api.StartTrialResponse
+					trialErr := ui.Spin("Starting trial...", func() error {
+						var err error
+						trialResult, err = client.StartOrganizationTrial(ctx, trialInfo.OrgLogin)
+						return err
+					})
+
+					if trialErr != nil {
+						ui.Error(fmt.Sprintf("Failed to start trial: %s", trialErr.Error()))
+						return trialErr
+					}
+
+					ui.Success(trialResult.Message)
+
+					// Retry vault creation now that trial is active
+					err = ui.Spin("Creating vault...", func() error {
+						_, err := client.InitVault(ctx, repo)
+						return err
+					})
+
+					if err == nil {
+						// Success! Continue with the rest of the flow
+						goto vaultCreated
+					}
+					// If it still fails, fall through to error handling
+				}
+			}
+
+			analytics.Track(analytics.EventError, map[string]interface{}{
+				"command": "init",
+				"error":   err.Error(),
+			})
 			ui.Error(apiErr.Error())
 			if apiErr.UpgradeURL != "" {
 				ui.Message(fmt.Sprintf("Upgrade: %s", ui.Link(apiErr.UpgradeURL)))
 			}
 		} else {
+			analytics.Track(analytics.EventError, map[string]interface{}{
+				"command": "init",
+				"error":   err.Error(),
+			})
 			ui.Error(err.Error())
 		}
 		return err
 	}
+
+vaultCreated:
 
 	ui.Success("Vault created!")
 
@@ -184,20 +228,41 @@ func ensureLoginAndGitHubApp(repo string) (string, error) {
 
 	_ = browser.OpenURL(status.InstallURL)
 
-	// Check for installation (user must complete installation and re-run)
-	err = ui.Spin("Checking GitHub App installation...", func() error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+	// Poll for installation (user completes installation in browser)
+	const pollInterval = 3 * time.Second
+	const pollTimeout = 2 * time.Minute
+	const maxConsecutiveErrors = 5
+
+	err = ui.Spin("Waiting for GitHub App installation...", func() error {
+		startTime := time.Now()
+		consecutiveErrors := 0
+
+		for time.Since(startTime) < pollTimeout {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(pollInterval):
+				// Continue polling
+			}
+
+			pollStatus, checkErr := client.CheckGitHubAppInstallation(ctx, parts[0], parts[1])
+			if checkErr == nil && pollStatus.Installed {
+				return nil // Success!
+			}
+
+			if checkErr != nil {
+				consecutiveErrors++
+				if consecutiveErrors >= maxConsecutiveErrors {
+					return fmt.Errorf("installation check failed after %d consecutive errors: %w", maxConsecutiveErrors, checkErr)
+				}
+				// Continue polling on transient errors
+			} else {
+				consecutiveErrors = 0 // Reset on successful API call (but not installed yet)
+			}
 		}
 
-		status, err := client.CheckGitHubAppInstallation(ctx, parts[0], parts[1])
-		if err == nil && status.Installed {
-			return nil
-		}
-
-		return fmt.Errorf("please install the GitHub App and run init again")
+		// Timeout
+		return fmt.Errorf("timed out waiting for installation (2 minutes)")
 	})
 
 	if err != nil {

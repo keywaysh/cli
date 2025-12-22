@@ -19,12 +19,12 @@ brew install keywaysh/tap/keyway
 ### curl (macOS/Linux)
 
 ```bash
-curl -fsSL https://get.keyway.sh | sh
+curl -fsSL https://keyway.sh/install.sh | sh
 ```
 
 ### Manual download
 
-Download from [GitHub Releases](https://github.com/keywaysh/cli/releases)
+Download from [GitHub Releases](https://github.com/keywaysh/cli-go/releases)
 
 ## Commands
 
@@ -34,6 +34,9 @@ keyway logout     # Clear credentials
 keyway init       # Initialize vault for repository
 keyway push       # Upload secrets to vault
 keyway pull       # Download secrets from vault
+keyway diff       # Compare local and remote secrets
+keyway sync       # Sync with external providers
+keyway scan       # Scan for leaked secrets
 keyway doctor     # Run environment checks
 ```
 

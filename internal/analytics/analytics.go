@@ -16,13 +16,13 @@ import (
 // Events constants for analytics tracking
 const (
 	// Core commands
-	EventLogin      = "cli_login"
-	EventInit       = "cli_init"
-	EventPush       = "cli_push"
-	EventPull       = "cli_pull"
-	EventDiff       = "cli_diff"
-	EventDoctor     = "cli_doctor"
-	EventScan       = "cli_scan"
+	EventLogin  = "cli_login"
+	EventInit   = "cli_init"
+	EventPush   = "cli_push"
+	EventPull   = "cli_pull"
+	EventDiff   = "cli_diff"
+	EventDoctor = "cli_doctor"
+	EventScan   = "cli_scan"
 
 	// Provider integration
 	EventConnect    = "cli_connect"

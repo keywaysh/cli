@@ -8,15 +8,15 @@ import (
 // MockClient is a mock implementation of APIClient for testing
 type MockClient struct {
 	// Auth mocks
-	StartDeviceLoginFn             func(ctx context.Context, repository string) (*DeviceStartResponse, error)
-	PollDeviceLoginFn              func(ctx context.Context, deviceCode string) (*DevicePollResponse, error)
-	ValidateTokenFn                func(ctx context.Context) (*ValidateTokenResponse, error)
-	CheckGitHubAppInstallationFn   func(ctx context.Context, repoOwner, repoName string) (*GitHubAppInstallationStatus, error)
+	StartDeviceLoginFn           func(ctx context.Context, repository string) (*DeviceStartResponse, error)
+	PollDeviceLoginFn            func(ctx context.Context, deviceCode string) (*DevicePollResponse, error)
+	ValidateTokenFn              func(ctx context.Context) (*ValidateTokenResponse, error)
+	CheckGitHubAppInstallationFn func(ctx context.Context, repoOwner, repoName string) (*GitHubAppInstallationStatus, error)
 
 	// Vault mocks
-	InitVaultFn             func(ctx context.Context, repoFullName string) (*InitVaultResponse, error)
-	CheckVaultExistsFn      func(ctx context.Context, repoFullName string) (bool, error)
-	GetVaultEnvironmentsFn  func(ctx context.Context, repoFullName string) ([]string, error)
+	InitVaultFn            func(ctx context.Context, repoFullName string) (*InitVaultResponse, error)
+	CheckVaultExistsFn     func(ctx context.Context, repoFullName string) (bool, error)
+	GetVaultEnvironmentsFn func(ctx context.Context, repoFullName string) ([]string, error)
 
 	// Secrets mocks
 	PushSecretsFn func(ctx context.Context, repo, env string, secrets map[string]string) (*PushSecretsResponse, error)
@@ -224,10 +224,10 @@ func (m *MockClient) GetAllProviderProjects(ctx context.Context, provider string
 		return m.GetAllProviderProjectsFn(ctx, provider)
 	}
 	return []ProviderProject{
-		{ID: "proj-1", Name: "my-project", ConnectionID: "conn-1"},
-	}, []Connection{
-		{ID: "conn-1", Provider: provider},
-	}, nil
+			{ID: "proj-1", Name: "my-project", ConnectionID: "conn-1"},
+		}, []Connection{
+			{ID: "conn-1", Provider: provider},
+		}, nil
 }
 
 // Sync methods

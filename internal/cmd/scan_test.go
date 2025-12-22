@@ -10,10 +10,10 @@ func TestMaskSecret(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"short", "*****"},                                                        // <= 10 chars, all masked
-		{"1234567890", "**********"},                                              // exactly 10, all masked
-		{"12345678901", "1234****901"},                                            // 11 chars, show first 4 and last 3
-		{"AKIAIOSFODNN7EXAMPLE", "AKIA*************PLE"},                          // 20 chars
+		{"short", "*****"},                               // <= 10 chars, all masked
+		{"1234567890", "**********"},                     // exactly 10, all masked
+		{"12345678901", "1234****901"},                   // 11 chars, show first 4 and last 3
+		{"AKIAIOSFODNN7EXAMPLE", "AKIA*************PLE"}, // 20 chars
 		{"ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "ghp_*********************************xxx"}, // 40 chars
 	}
 
@@ -305,8 +305,8 @@ func TestMaskSecret_EdgeCases(t *testing.T) {
 		{"ab", "**"},
 		{"abc", "***"},
 		{"abcd", "****"},
-		{"abcdefghij", "**********"},     // exactly 10 chars
-		{"abcdefghijk", "abcd****ijk"},   // 11 chars, shows first 4 and last 3
+		{"abcdefghij", "**********"},   // exactly 10 chars
+		{"abcdefghijk", "abcd****ijk"}, // 11 chars, shows first 4 and last 3
 		{"x", "*"},
 	}
 

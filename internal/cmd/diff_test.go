@@ -145,9 +145,9 @@ func TestCompareSecrets_IdenticalMaps(t *testing.T) {
 
 func TestCompareSecrets_OnlyInEnv1(t *testing.T) {
 	secrets1 := map[string]string{
-		"API_KEY":    "secret123",
-		"EXTRA_KEY":  "extra",
-		"ANOTHER":    "value",
+		"API_KEY":   "secret123",
+		"EXTRA_KEY": "extra",
+		"ANOTHER":   "value",
 	}
 	secrets2 := map[string]string{
 		"API_KEY": "secret123",

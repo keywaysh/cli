@@ -219,10 +219,18 @@ func discoverEnvFiles() []envCandidate {
 		return nil
 	}
 
+	// Template files to exclude (not real secrets)
+	excludeFiles := map[string]bool{
+		".env.local":    true, // Local overrides
+		".env.example":  true, // Template files
+		".env.sample":   true,
+		".env.template": true,
+	}
+
 	var candidates []envCandidate
 	for _, entry := range entries {
 		name := entry.Name()
-		if strings.HasPrefix(name, ".env") && name != ".env.local" && !entry.IsDir() {
+		if strings.HasPrefix(name, ".env") && !excludeFiles[name] && !entry.IsDir() {
 			candidates = append(candidates, envCandidate{
 				file: name,
 				env:  deriveEnvFromFile(name),

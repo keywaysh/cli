@@ -3,11 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/keywaysh/cli/internal/config"
@@ -25,13 +27,22 @@ type Client struct {
 	userAgent  string
 }
 
+// TrialEligibility contains trial information for org repos
+type TrialEligibility struct {
+	Eligible      bool   `json:"eligible"`
+	DaysAvailable int    `json:"daysAvailable"`
+	OrgLogin      string `json:"orgLogin"`
+	Reason        string `json:"reason,omitempty"`
+}
+
 // APIError represents an error from the API (RFC 7807)
 type APIError struct {
-	StatusCode int    `json:"-"`
-	Type       string `json:"type,omitempty"`
-	Title      string `json:"title,omitempty"`
-	Detail     string `json:"detail,omitempty"`
-	UpgradeURL string `json:"upgradeUrl,omitempty"`
+	StatusCode int               `json:"-"`
+	Type       string            `json:"type,omitempty"`
+	Title      string            `json:"title,omitempty"`
+	Detail     string            `json:"detail,omitempty"`
+	UpgradeURL string            `json:"upgradeUrl,omitempty"`
+	TrialInfo  *TrialEligibility `json:"trialInfo,omitempty"`
 }
 
 func (e *APIError) Error() string {
@@ -46,13 +57,24 @@ func (e *APIError) Error() string {
 
 // NewClient creates a new API client
 func NewClient(token string) *Client {
+	httpClient := &http.Client{
+		Timeout: defaultTimeout,
+	}
+
+	// Allow insecure TLS for local development (self-signed certs)
+	if os.Getenv("KEYWAY_INSECURE") == "1" {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	}
+
 	return &Client{
-		baseURL: config.GetAPIURL(),
-		httpClient: &http.Client{
-			Timeout: defaultTimeout,
-		},
-		token:     token,
-		userAgent: "keyway-cli/dev", // Will be set properly at build time
+		baseURL:    config.GetAPIURL(),
+		httpClient: httpClient,
+		token:      token,
+		userAgent:  "keyway-cli/dev", // Will be set properly at build time
 	}
 }
 
@@ -129,27 +151,14 @@ func (c *Client) handleNetworkError(err error) error {
 	}
 	// Check for common network errors
 	errStr := err.Error()
-	if contains(errStr, "no such host") {
+	if strings.Contains(errStr, "no such host") {
 		return fmt.Errorf("DNS lookup failed - check your internet connection")
 	}
-	if contains(errStr, "connection refused") {
+	if strings.Contains(errStr, "connection refused") {
 		return fmt.Errorf("connection refused - is the API server running?")
 	}
-	if contains(errStr, "certificate") {
+	if strings.Contains(errStr, "certificate") {
 		return fmt.Errorf("SSL certificate error - check your system time")
 	}
 	return fmt.Errorf("network error: %w", err)
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsAt(s, substr, 0))
-}
-
-func containsAt(s, substr string, start int) bool {
-	for i := start; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

@@ -1,6 +1,6 @@
 # @keywaysh/cli
 
-GitHub-native secrets management CLI.
+GitHub-native secrets management. If you have repo access, you get secret access.
 
 ## Installation
 
@@ -8,46 +8,39 @@ GitHub-native secrets management CLI.
 npm install -g @keywaysh/cli
 ```
 
-## Alternative installation methods
-
-### Homebrew (macOS/Linux)
+Or with npx:
 
 ```bash
-brew install keywaysh/tap/keyway
+npx @keywaysh/cli pull
 ```
 
-### curl (macOS/Linux)
+## Quick Start
 
 ```bash
-curl -fsSL https://get.keyway.sh | sh
-```
-
-### Manual download
-
-Download the latest release from [GitHub Releases](https://github.com/keywaysh/cli/releases).
-
-## Usage
-
-```bash
-# Authenticate with GitHub
+# Sign in with GitHub
 keyway login
 
-# Initialize a vault for your repository
+# Initialize vault for current repo
 keyway init
 
-# Push secrets to the vault
+# Push secrets from .env
 keyway push
 
-# Pull secrets from the vault
+# Pull secrets to .env
 keyway pull
+```
 
-# Run diagnostics
-keyway doctor
+## Alternative Installation
+
+Using the install script:
+
+```bash
+curl -fsSL https://keyway.sh/install.sh | sh
 ```
 
 ## Documentation
 
-Full documentation at [docs.keyway.sh](https://docs.keyway.sh)
+Visit [docs.keyway.sh](https://docs.keyway.sh) for full documentation.
 
 ## License
 

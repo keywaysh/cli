@@ -34,8 +34,8 @@ type ConnectTokenResponse struct {
 type ProviderProject struct {
 	ID           string   `json:"id"`
 	Name         string   `json:"name"`
-	ServiceID    *string  `json:"serviceId,omitempty"`    // Railway: service ID
-	ServiceName  *string  `json:"serviceName,omitempty"`  // Railway: service name
+	ServiceID    *string  `json:"serviceId,omitempty"`   // Railway: service ID
+	ServiceName  *string  `json:"serviceName,omitempty"` // Railway: service name
 	LinkedRepo   *string  `json:"linkedRepo,omitempty"`
 	Environments []string `json:"environments,omitempty"`
 	ConnectionID string   `json:"connectionId"`

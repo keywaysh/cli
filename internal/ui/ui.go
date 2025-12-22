@@ -119,33 +119,6 @@ func Select(message string, options []string) (string, error) {
 	return result, err
 }
 
-// SelectWithValues prompts for selection with custom values
-func SelectWithValues(message string, options []struct{ Label, Value string }) (string, error) {
-	var result string
-	opts := make([]huh.Option[string], len(options))
-	for i, opt := range options {
-		opts[i] = huh.NewOption(opt.Label, opt.Value)
-	}
-
-	err := huh.NewSelect[string]().
-		Title(message).
-		Options(opts...).
-		Value(&result).
-		Run()
-	return result, err
-}
-
-// Text prompts for text input
-func Text(message string, placeholder string) (string, error) {
-	var result string
-	err := huh.NewInput().
-		Title(message).
-		Placeholder(placeholder).
-		Value(&result).
-		Run()
-	return result, err
-}
-
 // Password prompts for password input (masked)
 func Password(message string) (string, error) {
 	var result string
@@ -170,22 +143,6 @@ func Spin(message string, fn func() error) error {
 		return spinErr
 	}
 	return err
-}
-
-// SpinWithResult shows a spinner and allows returning a result
-func SpinWithResult[T any](message string, fn func() (T, error)) (T, error) {
-	var result T
-	var err error
-	spinErr := spinner.New().
-		Title(message).
-		Action(func() {
-			result, err = fn()
-		}).
-		Run()
-	if spinErr != nil {
-		return result, spinErr
-	}
-	return result, err
 }
 
 // IsInteractive returns true if running in an interactive terminal

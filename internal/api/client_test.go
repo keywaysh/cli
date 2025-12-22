@@ -249,27 +249,3 @@ func TestClient_do_NoToken(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
-
-func TestContains(t *testing.T) {
-	tests := []struct {
-		s        string
-		substr   string
-		expected bool
-	}{
-		{"hello world", "world", true},
-		{"hello world", "foo", false},
-		{"hello", "hello", true},
-		{"", "", true},
-		{"hello", "", true},
-		{"", "hello", false},
-		{"connection refused", "refused", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.s+"_"+tt.substr, func(t *testing.T) {
-			if got := contains(tt.s, tt.substr); got != tt.expected {
-				t.Errorf("contains(%q, %q) = %v, want %v", tt.s, tt.substr, got, tt.expected)
-			}
-		})
-	}
-}

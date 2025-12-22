@@ -1,8 +1,13 @@
 # Binaries
-bin/
+/bin/
 dist/
 /keyway
 /keyway-dev
+
+# npm package - keep wrapper, ignore downloaded binary
+!npm/bin/keyway
+npm/bin/keyway-bin
+npm/bin/keyway-bin.exe
 *.exe
 *.exe~
 *.dll

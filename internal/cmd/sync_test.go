@@ -184,11 +184,11 @@ func TestFindMatchingProject(t *testing.T) {
 			shouldFind:    false,
 		},
 		{
-			name:         "partial match - unique",
-			repoFullName: "owner/project-a-extended",
-			expectedID:   "1",
+			name:          "partial match - unique",
+			repoFullName:  "owner/project-a-extended",
+			expectedID:    "1",
 			expectedMatch: "partial_name",
-			shouldFind:   true,
+			shouldFind:    true,
 		},
 	}
 

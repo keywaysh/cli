@@ -40,13 +40,13 @@ func init() {
 
 // DiffResult represents the comparison between two environments
 type DiffResult struct {
-	Env1       string       `json:"env1"`
-	Env2       string       `json:"env2"`
-	OnlyInEnv1 []string     `json:"onlyInEnv1"`
-	OnlyInEnv2 []string     `json:"onlyInEnv2"`
-	Different  []DiffEntry  `json:"different"`
-	Same       []string     `json:"same"`
-	Stats      DiffStats    `json:"stats"`
+	Env1       string      `json:"env1"`
+	Env2       string      `json:"env2"`
+	OnlyInEnv1 []string    `json:"onlyInEnv1"`
+	OnlyInEnv2 []string    `json:"onlyInEnv2"`
+	Different  []DiffEntry `json:"different"`
+	Same       []string    `json:"same"`
+	Stats      DiffStats   `json:"stats"`
 }
 
 type DiffEntry struct {
