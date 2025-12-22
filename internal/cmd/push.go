@@ -131,6 +131,60 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 	ui.Step(fmt.Sprintf("Repository: %s", ui.Value(repo)))
 
+	token, err := EnsureLogin()
+	if err != nil {
+		ui.Error(err.Error())
+		return err
+	}
+
+	client := api.NewClient(token)
+	ctx := context.Background()
+
+	// Fetch current vault state to show preview
+	var vaultSecrets map[string]string
+	err = ui.Spin("Fetching current vault state...", func() error {
+		resp, err := client.PullSecrets(ctx, repo, env)
+		if err != nil {
+			// Vault might not exist yet, that's ok
+			if apiErr, ok := err.(*api.APIError); ok && apiErr.StatusCode == 404 {
+				vaultSecrets = make(map[string]string)
+				return nil
+			}
+			return err
+		}
+		vaultSecrets = parseEnvContent(resp.Content)
+		return nil
+	})
+
+	if err != nil {
+		if apiErr, ok := err.(*api.APIError); ok {
+			ui.Error(apiErr.Error())
+		} else {
+			ui.Error(err.Error())
+		}
+		return err
+	}
+
+	// Calculate and show diff
+	diff := calculatePushDiff(secrets, vaultSecrets)
+
+	if diff.hasChanges() {
+		ui.Message("")
+		ui.Message("Changes:")
+		for _, key := range diff.added {
+			ui.DiffAdded(key)
+		}
+		for _, key := range diff.changed {
+			ui.DiffChanged(key)
+		}
+		for _, key := range diff.removed {
+			ui.DiffRemoved(key)
+		}
+		ui.Message("")
+	} else {
+		ui.Info("No changes detected")
+	}
+
 	// Confirm
 	if !yes && ui.IsInteractive() {
 		confirm, _ := ui.Confirm(fmt.Sprintf("Push %d secrets from %s to %s?", len(secrets), file, repo), true)
@@ -141,15 +195,6 @@ func runPush(cmd *cobra.Command, args []string) error {
 	} else if !yes {
 		return fmt.Errorf("confirmation required - use --yes in non-interactive mode")
 	}
-
-	token, err := EnsureLogin()
-	if err != nil {
-		ui.Error(err.Error())
-		return err
-	}
-
-	client := api.NewClient(token)
-	ctx := context.Background()
 
 	// Track push event
 	analytics.Track(analytics.EventPush, map[string]interface{}{
@@ -278,4 +323,38 @@ func parseEnvContent(content string) map[string]string {
 		}
 	}
 	return result
+}
+
+type pushDiff struct {
+	added   []string // in local, not in vault (will be created)
+	changed []string // in both, different values (will be updated)
+	removed []string // in vault, not in local (will be deleted)
+}
+
+func (d *pushDiff) hasChanges() bool {
+	return len(d.added) > 0 || len(d.changed) > 0 || len(d.removed) > 0
+}
+
+func calculatePushDiff(local, vault map[string]string) *pushDiff {
+	diff := &pushDiff{}
+
+	// Check local secrets against vault
+	for key, localVal := range local {
+		if vaultVal, exists := vault[key]; exists {
+			if localVal != vaultVal {
+				diff.changed = append(diff.changed, key)
+			}
+		} else {
+			diff.added = append(diff.added, key)
+		}
+	}
+
+	// Find vault-only secrets (will be removed)
+	for key := range vault {
+		if _, exists := local[key]; !exists {
+			diff.removed = append(diff.removed, key)
+		}
+	}
+
+	return diff
 }

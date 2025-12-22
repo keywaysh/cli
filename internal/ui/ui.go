@@ -158,3 +158,23 @@ func IsInteractive() bool {
 	}
 	return (fi.Mode() & os.ModeCharDevice) != 0
 }
+
+// DiffAdded displays a variable that will be added
+func DiffAdded(key string) {
+	green.Printf("  + %s\n", key)
+}
+
+// DiffChanged displays a variable that will be updated
+func DiffChanged(key string) {
+	yellow.Printf("  ~ %s\n", key)
+}
+
+// DiffRemoved displays a variable that will be removed
+func DiffRemoved(key string) {
+	red.Printf("  - %s\n", key)
+}
+
+// DiffKept displays a variable that will be kept (local only)
+func DiffKept(key string) {
+	dim.Printf("  • %s %s\n", key, "(local only, kept)")
+}

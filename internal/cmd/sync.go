@@ -267,36 +267,38 @@ func runSync(cmd *cobra.Command, args []string) error {
 	// Get all projects from provider
 	providerDisplayName := cases.Title(language.English).String(provider)
 	allProjects, connections, err := client.GetAllProviderProjects(ctx, provider)
-	if err != nil {
-		// Check if not connected
-		if strings.Contains(err.Error(), "not connected") || len(connections) == 0 {
-			ui.Warn(fmt.Sprintf("Not connected to %s.", providerDisplayName))
 
-			if ui.IsInteractive() {
-				shouldConnect, _ := ui.Confirm(fmt.Sprintf("Connect to %s now?", providerDisplayName), true)
-				if !shouldConnect {
-					return nil
-				}
+	// Check if not connected (either error or empty connections)
+	notConnected := err != nil && (strings.Contains(err.Error(), "not connected") || strings.Contains(err.Error(), "no connections"))
+	notConnected = notConnected || (err == nil && len(connections) == 0)
 
-				err = RunConnectCommand(provider)
-				if err != nil {
-					return err
-				}
+	if notConnected {
+		ui.Warn(fmt.Sprintf("Not connected to %s.", providerDisplayName))
 
-				// Refresh projects
-				allProjects, connections, err = client.GetAllProviderProjects(ctx, provider)
-				if err != nil {
-					ui.Error("Failed to fetch projects after connecting")
-					return err
-				}
-			} else {
-				ui.Message(ui.Dim(fmt.Sprintf("Run `keyway connect %s` first.", provider)))
-				return fmt.Errorf("not connected to provider")
+		if ui.IsInteractive() {
+			shouldConnect, _ := ui.Confirm(fmt.Sprintf("Connect to %s now?", providerDisplayName), true)
+			if !shouldConnect {
+				return nil
+			}
+
+			err = RunConnectCommand(provider)
+			if err != nil {
+				return err
+			}
+
+			// Refresh projects
+			allProjects, connections, err = client.GetAllProviderProjects(ctx, provider)
+			if err != nil {
+				ui.Error("Failed to fetch projects after connecting")
+				return err
 			}
 		} else {
-			ui.Error("Failed to fetch provider projects")
-			return err
+			ui.Message(ui.Dim(fmt.Sprintf("Run `keyway connect %s` first.", provider)))
+			return fmt.Errorf("not connected to provider")
 		}
+	} else if err != nil {
+		ui.Error("Failed to fetch provider projects")
+		return err
 	}
 
 	// Convert to ProjectWithLinkedRepo
