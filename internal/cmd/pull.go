@@ -129,6 +129,14 @@ func runPull(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Tip about keyway run (Zero-Trust)
+	if ui.IsInteractive() {
+		ui.Message("")
+		ui.Message(fmt.Sprintf("%s %s", ui.Bold("💡 Tip:"), "To avoid writing secrets to disk (safer for AI agents), use:"))
+		ui.Message(fmt.Sprintf("   %s", ui.Command(fmt.Sprintf("keyway run --env %s -- <command>", env))))
+		ui.Message("")
+	}
+
 	vaultSecrets := parseEnvContent(vaultContent)
 	envFilePath := filepath.Join(".", file)
 
