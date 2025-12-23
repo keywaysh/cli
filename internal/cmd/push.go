@@ -46,6 +46,7 @@ func runPush(cmd *cobra.Command, args []string) error {
 	env, _ := cmd.Flags().GetString("env")
 	file, _ := cmd.Flags().GetString("file")
 	yes, _ := cmd.Flags().GetBool("yes")
+	envFlagSet := cmd.Flags().Changed("env")
 
 	// Discover env files
 	candidates := discoverEnvFiles()
@@ -121,7 +122,6 @@ func runPush(cmd *cobra.Command, args []string) error {
 	}
 
 	ui.Step(fmt.Sprintf("File: %s", ui.File(file)))
-	ui.Step(fmt.Sprintf("Environment: %s", ui.Value(env)))
 	ui.Step(fmt.Sprintf("Variables: %s", ui.Value(len(secrets))))
 
 	repo, err := git.DetectRepo()
@@ -139,6 +139,46 @@ func runPush(cmd *cobra.Command, args []string) error {
 
 	client := api.NewClient(token)
 	ctx := context.Background()
+
+	// Prompt for environment if not specified
+	if !envFlagSet && ui.IsInteractive() {
+		// Fetch available environments
+		vaultEnvs, err := client.GetVaultEnvironments(ctx, repo)
+		if err != nil || len(vaultEnvs) == 0 {
+			vaultEnvs = []string{"development", "staging", "production"}
+		}
+
+		// Find current env in list or add it
+		derivedEnv := env
+		found := false
+		for _, e := range vaultEnvs {
+			if e == derivedEnv {
+				found = true
+				break
+			}
+		}
+		if !found && derivedEnv != "" {
+			vaultEnvs = append([]string{derivedEnv}, vaultEnvs...)
+		}
+
+		// Put derived env first
+		for i, e := range vaultEnvs {
+			if e == derivedEnv {
+				if i > 0 {
+					vaultEnvs[0], vaultEnvs[i] = vaultEnvs[i], vaultEnvs[0]
+				}
+				break
+			}
+		}
+
+		selected, err := ui.Select("Push to environment:", vaultEnvs)
+		if err != nil {
+			return err
+		}
+		env = selected
+	}
+
+	ui.Step(fmt.Sprintf("Environment: %s", ui.Value(env)))
 
 	// Fetch current vault state to show preview
 	var vaultSecrets map[string]string
@@ -169,16 +209,25 @@ func runPush(cmd *cobra.Command, args []string) error {
 	diff := calculatePushDiff(secrets, vaultSecrets)
 
 	if diff.hasChanges() {
-		ui.Message("")
-		ui.Message("Changes:")
-		for _, key := range diff.added {
-			ui.DiffAdded(key)
+		// Show additions and updates
+		if len(diff.added) > 0 || len(diff.changed) > 0 {
+			ui.Message("")
+			ui.Message("Will be pushed to vault:")
+			for _, key := range diff.added {
+				ui.DiffAdded(key)
+			}
+			for _, key := range diff.changed {
+				ui.DiffChanged(key)
+			}
 		}
-		for _, key := range diff.changed {
-			ui.DiffChanged(key)
-		}
-		for _, key := range diff.removed {
-			ui.DiffRemoved(key)
+
+		// Show removals separately (soft-delete to trash)
+		if len(diff.removed) > 0 {
+			ui.Message("")
+			ui.Message("Will be moved to trash (not in local file):")
+			for _, key := range diff.removed {
+				ui.DiffRemoved(key)
+			}
 		}
 		ui.Message("")
 	} else {

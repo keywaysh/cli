@@ -48,8 +48,7 @@ func runPull(cmd *cobra.Command, args []string) error {
 	file, _ := cmd.Flags().GetString("file")
 	yes, _ := cmd.Flags().GetBool("yes")
 	force, _ := cmd.Flags().GetBool("force")
-
-	ui.Step(fmt.Sprintf("Environment: %s", ui.Value(env)))
+	envFlagSet := cmd.Flags().Changed("env")
 
 	repo, err := git.DetectRepo()
 	if err != nil {
@@ -66,6 +65,37 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	client := api.NewClient(token)
 	ctx := context.Background()
+
+	// Prompt for environment if not specified
+	if !envFlagSet && ui.IsInteractive() {
+		// Fetch available environments
+		vaultEnvs, err := client.GetVaultEnvironments(ctx, repo)
+		if err != nil || len(vaultEnvs) == 0 {
+			vaultEnvs = []string{"development", "staging", "production"}
+		}
+
+		// Find default index
+		defaultIdx := 0
+		for i, e := range vaultEnvs {
+			if e == "development" {
+				defaultIdx = i
+				break
+			}
+		}
+
+		// Reorder to put default first
+		if defaultIdx > 0 {
+			vaultEnvs[0], vaultEnvs[defaultIdx] = vaultEnvs[defaultIdx], vaultEnvs[0]
+		}
+
+		selected, err := ui.Select("Environment:", vaultEnvs)
+		if err != nil {
+			return err
+		}
+		env = selected
+	}
+
+	ui.Step(fmt.Sprintf("Environment: %s", ui.Value(env)))
 
 	// Track pull event
 	analytics.Track(analytics.EventPull, map[string]interface{}{
