@@ -1,5 +1,7 @@
 # Keyway CLI
 
+[![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=keywaysh/cli-go)](https://www.keyway.sh/vaults/keywaysh/cli-go)
+
 GitHub-native secrets management. Sync secrets with your team and infra.
 
 ## Installation

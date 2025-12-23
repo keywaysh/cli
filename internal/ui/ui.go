@@ -90,7 +90,7 @@ func Bold(text string) string {
 
 // Confirm prompts for yes/no confirmation
 func Confirm(message string, defaultValue bool) (bool, error) {
-	var result bool
+	result := defaultValue
 	err := huh.NewConfirm().
 		Title(message).
 		Value(&result).
