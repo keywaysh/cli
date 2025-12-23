@@ -2,8 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/fatih/color"
+	"github.com/keywaysh/cli/internal/auth"
+	"github.com/keywaysh/cli/internal/git"
+	"github.com/keywaysh/cli/internal/ui"
+	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 )
 
@@ -18,9 +23,98 @@ var rootCmd = &cobra.Command{
 	Short:         "Sync secrets with your team and infra",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE:          runRoot,
+}
+
+func runRoot(cmd *cobra.Command, args []string) error {
+	// Check if running in non-interactive mode
+	if !ui.IsInteractive() {
 		printCustomHelp(cmd)
-	},
+		return nil
+	}
+
+	// Check if user is logged in
+	store := auth.NewStore()
+	storedAuth, err := store.GetAuth()
+	isLoggedIn := err == nil && storedAuth != nil && storedAuth.KeywayToken != ""
+
+	// Also check env var
+	if os.Getenv("KEYWAY_TOKEN") != "" {
+		isLoggedIn = true
+	}
+
+	if !isLoggedIn {
+		// Not logged in: run full onboarding flow
+		return runOnboarding(cmd)
+	}
+
+	// Logged in: show action menu
+	return runActionMenu(cmd)
+}
+
+func runOnboarding(cmd *cobra.Command) error {
+	ui.Intro("welcome")
+
+	ui.Message("Let's set up Keyway for this project.")
+	ui.Message("")
+
+	// Check if we're in a git repo
+	repo, err := git.DetectRepo()
+	if err != nil {
+		ui.Error("Not in a git repository with GitHub remote")
+		ui.Message(ui.Dim("Navigate to your project folder and try again."))
+		return err
+	}
+
+	ui.Step(fmt.Sprintf("Repository: %s", ui.Value(repo)))
+
+	// Run init (which handles login, GitHub App, vault creation, and push)
+	return runInit(initCmd, nil)
+}
+
+func runActionMenu(cmd *cobra.Command) error {
+	fmt.Println()
+
+	// Show current repo if available
+	repo, _ := git.DetectRepo()
+	if repo != "" {
+		ui.Step(fmt.Sprintf("Repository: %s", ui.Value(repo)))
+	}
+
+	options := []string{
+		"Pull secrets from vault",
+		"Push secrets to vault",
+		"Sync with Vercel/Railway/Netlify",
+		"Open dashboard",
+		"Show help",
+	}
+
+	selected, err := ui.Select("What would you like to do?", options)
+	if err != nil {
+		return err
+	}
+
+	switch selected {
+	case "Pull secrets from vault":
+		return runPull(pullCmd, nil)
+	case "Push secrets to vault":
+		return runPush(pushCmd, nil)
+	case "Sync with Vercel/Railway/Netlify":
+		return runSync(syncCmd, nil)
+	case "Open dashboard":
+		url := "https://www.keyway.sh/dashboard"
+		if repo != "" {
+			url = fmt.Sprintf("https://www.keyway.sh/dashboard/vaults/%s", repo)
+		}
+		ui.Success(fmt.Sprintf("Opening %s", ui.Link(url)))
+		_ = browser.OpenURL(url)
+		return nil
+	case "Show help":
+		printCustomHelp(cmd)
+		return nil
+	}
+
+	return nil
 }
 
 func printCustomHelp(cmd *cobra.Command) {
