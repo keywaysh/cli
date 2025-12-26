@@ -9,12 +9,13 @@ Keyway CLI (Go) is the command-line interface for Keyway, a GitHub-native secret
 ## Development Commands
 
 ```bash
-make build          # Build for current platform → ./keyway-dev
-make build-all      # Build for all platforms → ./dist/
-make test           # Run tests
-make test-coverage  # Run tests with coverage report
-make lint           # Run golangci-lint
-make install        # Install to ~/bin/keyway-dev
+make build              # Build for current platform → ./bin/keyway
+make build-all          # Build for all platforms → ./bin/
+make test               # Run tests
+make test-coverage      # Run tests with full coverage report
+make test-coverage-logic # Coverage for business logic only (excludes wrappers)
+make lint               # Run golangci-lint
+make install            # Install to /usr/local/bin
 ```
 
 ## Architecture
@@ -22,73 +23,154 @@ make install        # Install to ~/bin/keyway-dev
 ```
 cmd/keyway/         # Entry point (main.go)
 internal/
-├── cmd/            # Cobra commands (login, init, push, pull, scan, etc.)
+├── cmd/            # Cobra commands with DI pattern
+│   ├── deps.go         # Interface definitions
+│   ├── deps_real.go    # Real implementations (thin wrappers)
+│   ├── mocks_test.go   # Mock implementations for testing
+│   ├── pull.go         # Pull command
+│   ├── push.go         # Push command
+│   ├── init.go         # Init command
+│   ├── doctor.go       # Doctor command
+│   └── auth_error.go   # Auth error handling (401 retry)
 ├── api/            # Keyway API client
 ├── auth/           # Token storage (keyring)
 ├── config/         # Configuration and environment
 ├── git/            # Git repository detection
 ├── analytics/      # PostHog telemetry
+├── env/            # Env file parsing and diffing
 └── ui/             # Terminal UI helpers (huh, spinner, colors)
 npm/                # npm package for distribution
 ```
 
 ## Key Patterns
 
-### Commands
-All commands use Cobra and follow this pattern:
+### Dependency Injection Pattern
+
+All commands use a DI pattern for testability. Each command has:
+1. A thin wrapper `runXXX` that parses flags and calls `runXXXWithDeps`
+2. A testable `runXXXWithDeps` that receives a `*Dependencies` struct
+
 ```go
-var exampleCmd = &cobra.Command{
-    Use:   "example",
-    Short: "Short description",
-    RunE:  runExample,
+// deps.go - Interface definitions
+type GitClient interface {
+    DetectRepo() (string, error)
+    CheckEnvGitignore() bool
+    AddEnvToGitignore() error
+    IsGitRepository() bool
 }
 
-func runExample(cmd *cobra.Command, args []string) error {
-    ui.Intro("example")
-    // ... implementation
-    ui.Outro("Done!")
-    return nil
+type Dependencies struct {
+    Git        GitClient
+    Auth       AuthProvider
+    UI         UIProvider
+    FS         FileSystem
+    Env        EnvHelper
+    APIFactory APIClientFactory
+    // ... more interfaces
+}
+
+// command.go - Command implementation
+func runPull(cmd *cobra.Command, args []string) error {
+    opts := PullOptions{...}
+    return runPullWithDeps(opts, defaultDeps)  // defaultDeps has real implementations
+}
+
+func runPullWithDeps(opts PullOptions, deps *Dependencies) error {
+    // All business logic here, using deps.* for external calls
+    repo, err := deps.Git.DetectRepo()
+    // ...
 }
 ```
 
+### Testing with Mocks
+
+Tests inject mock implementations via the Dependencies struct:
+
+```go
+// mocks_test.go
+type MockGitClient struct {
+    Repo           string
+    RepoError      error
+    EnvInGitignore bool
+}
+
+func (m *MockGitClient) DetectRepo() (string, error) {
+    return m.Repo, m.RepoError
+}
+
+// command_test.go
+func TestRunPullWithDeps_Success(t *testing.T) {
+    deps, gitMock, uiMock, _, _ := NewTestDeps()
+    gitMock.Repo = "owner/repo"
+
+    err := runPullWithDeps(PullOptions{EnvName: "dev"}, deps)
+
+    if err != nil {
+        t.Fatalf("unexpected error: %v", err)
+    }
+}
+```
+
+### Auth Error Handling
+
+401 errors are handled with automatic re-login prompt:
+
+```go
+// In any command that makes API calls:
+if isAuthError(err) {
+    newToken, authErr := handleAuthError(err, deps)
+    if authErr != nil {
+        return authErr
+    }
+    // Retry with new token
+    client = deps.APIFactory.NewClient(newToken)
+}
+```
+
+- Interactive mode: clears token, prompts to re-login via browser
+- Non-interactive mode: shows clear instructions to run `keyway logout && keyway login`
+
 ### API Client
+
 ```go
 client := api.NewClient(token)
 secrets, err := client.PullSecrets(ctx, owner, repo, env)
 ```
 
 ### UI Helpers
+
 ```go
-ui.Intro("command")      // Command banner
-ui.Success("message")    // Green checkmark
-ui.Error("message")      // Red X
-ui.Spin("Loading...", func() error { ... })
+deps.UI.Intro("command")      // Command banner
+deps.UI.Success("message")    // Green checkmark
+deps.UI.Error("message")      // Red X
+deps.UI.Spin("Loading...", func() error { ... })
 ```
 
 ## Testing
 
-Tests use table-driven patterns and mocks:
-```go
-func TestExample(t *testing.T) {
-    tests := []struct {
-        name    string
-        input   string
-        want    string
-        wantErr bool
-    }{...}
-    
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {...})
-    }
-}
+### Coverage Strategy
+
+- **Business logic** (`runXXXWithDeps` functions): Fully testable via DI, target ~90%+
+- **Thin wrappers** (`deps_real.go`): Not unit tested (just delegate to real implementations)
+- **Entry points** (`runXXX`, `cmd/keyway/main.go`): Not unit tested
+
+Codecov is configured to ignore non-testable code (see `.codecov.yml`).
+
+### Running Tests
+
+```bash
+make test                    # All tests
+make test-coverage-logic     # Coverage for business logic only
+go test -v ./internal/cmd/... # Verbose output for cmd package
 ```
 
 ## Release Process
 
-1. Tag and push: `git tag v0.2.0 && git push origin v0.2.0`
+1. Tag and push: `git tag v0.3.12 && git push origin v0.3.12`
 2. GoReleaser builds binaries for all platforms
 3. macOS binaries are signed and notarized
 4. Binaries uploaded to GitHub Releases
+5. npm package auto-publishes
 
 ## npm Distribution
 
