@@ -130,19 +130,38 @@ func runPullWithDeps(opts PullOptions, deps *Dependencies) error {
 	})
 
 	if err != nil {
-		analytics.Track(analytics.EventError, map[string]interface{}{
-			"command": "pull",
-			"error":   err.Error(),
-		})
-		if apiErr, ok := err.(*api.APIError); ok {
-			deps.UI.Error(apiErr.Error())
-			if apiErr.UpgradeURL != "" {
-				deps.UI.Message(fmt.Sprintf("Upgrade: %s", deps.UI.Link(apiErr.UpgradeURL)))
+		// Handle auth errors (expired token)
+		if isAuthError(err) {
+			newToken, authErr := handleAuthError(err, deps)
+			if authErr != nil {
+				return authErr
 			}
-		} else {
-			deps.UI.Error(err.Error())
+			// Retry with new token
+			client = deps.APIFactory.NewClient(newToken)
+			err = deps.UI.Spin("Downloading secrets...", func() error {
+				resp, pullErr := client.PullSecrets(ctx, repo, envName)
+				if pullErr != nil {
+					return pullErr
+				}
+				vaultContent = resp.Content
+				return nil
+			})
 		}
-		return err
+		if err != nil {
+			analytics.Track(analytics.EventError, map[string]interface{}{
+				"command": "pull",
+				"error":   err.Error(),
+			})
+			if apiErr, ok := err.(*api.APIError); ok {
+				deps.UI.Error(apiErr.Error())
+				if apiErr.UpgradeURL != "" {
+					deps.UI.Message(fmt.Sprintf("Upgrade: %s", deps.UI.Link(apiErr.UpgradeURL)))
+				}
+			} else {
+				deps.UI.Error(err.Error())
+			}
+			return err
+		}
 	}
 
 	// Tip about keyway run (Zero-Trust)

@@ -68,6 +68,19 @@ func runInitWithDeps(opts InitOptions, deps *Dependencies) error {
 
 	// Check if vault already exists
 	exists, err := client.CheckVaultExists(ctx, repo)
+	if err != nil {
+		// Handle auth errors (expired token)
+		if isAuthError(err) {
+			newToken, authErr := handleAuthError(err, deps)
+			if authErr != nil {
+				return authErr
+			}
+			// Retry with new token
+			token = newToken
+			client = deps.APIFactory.NewClient(token)
+			exists, err = client.CheckVaultExists(ctx, repo)
+		}
+	}
 	if err == nil && exists {
 		deps.UI.Success("Already initialized!")
 		deps.UI.Message(deps.UI.Dim(fmt.Sprintf("Run %s to sync your secrets", deps.UI.Command("keyway push"))))
@@ -89,6 +102,29 @@ func runInitWithDeps(opts InitOptions, deps *Dependencies) error {
 
 	if err != nil {
 		if apiErr, ok := err.(*api.APIError); ok {
+			// Handle auth errors (expired token)
+			if apiErr.StatusCode == 401 {
+				newToken, authErr := handleAuthError(err, deps)
+				if authErr != nil {
+					return authErr
+				}
+				// Retry with new token
+				client = deps.APIFactory.NewClient(newToken)
+				err = deps.UI.Spin("Creating vault...", func() error {
+					_, err := client.InitVault(ctx, repo)
+					return err
+				})
+				if err == nil {
+					goto vaultCreated
+				}
+				// If still error, continue to handle it
+				apiErr, ok = err.(*api.APIError)
+				if !ok {
+					deps.UI.Error(err.Error())
+					return err
+				}
+			}
+
 			// Already exists (409 Conflict)
 			if apiErr.StatusCode == 409 {
 				deps.UI.Success("Already initialized!")

@@ -213,12 +213,35 @@ func runPushWithDeps(opts PushOptions, deps *Dependencies) error {
 	})
 
 	if err != nil {
-		if apiErr, ok := err.(*api.APIError); ok {
-			deps.UI.Error(apiErr.Error())
-		} else {
-			deps.UI.Error(err.Error())
+		// Handle auth errors (expired token)
+		if isAuthError(err) {
+			newToken, authErr := handleAuthError(err, deps)
+			if authErr != nil {
+				return authErr
+			}
+			// Retry with new token
+			client = deps.APIFactory.NewClient(newToken)
+			err = deps.UI.Spin("Fetching current vault state...", func() error {
+				resp, err := client.PullSecrets(ctx, repo, envName)
+				if err != nil {
+					if apiErr, ok := err.(*api.APIError); ok && apiErr.StatusCode == 404 {
+						vaultSecrets = make(map[string]string)
+						return nil
+					}
+					return err
+				}
+				vaultSecrets = env.Parse(resp.Content)
+				return nil
+			})
 		}
-		return err
+		if err != nil {
+			if apiErr, ok := err.(*api.APIError); ok {
+				deps.UI.Error(apiErr.Error())
+			} else {
+				deps.UI.Error(err.Error())
+			}
+			return err
+		}
 	}
 
 	// Calculate and show diff
@@ -276,23 +299,39 @@ func runPushWithDeps(opts PushOptions, deps *Dependencies) error {
 	})
 
 	if err != nil {
-		analytics.Track(analytics.EventError, map[string]interface{}{
-			"command": "push",
-			"error":   err.Error(),
-		})
-		if apiErr, ok := err.(*api.APIError); ok {
-			deps.UI.Error(apiErr.Error())
-			if apiErr.UpgradeURL != "" {
-				analytics.Track(analytics.EventUpgradePrompt, map[string]interface{}{
-					"reason":  "push_error",
-					"command": "push",
-				})
-				deps.UI.Message(fmt.Sprintf("Upgrade: %s", deps.UI.Link(apiErr.UpgradeURL)))
+		// Handle auth errors (expired token)
+		if isAuthError(err) {
+			newToken, authErr := handleAuthError(err, deps)
+			if authErr != nil {
+				return authErr
 			}
-		} else {
-			deps.UI.Error(err.Error())
+			// Retry with new token
+			client = deps.APIFactory.NewClient(newToken)
+			err = deps.UI.Spin("Uploading secrets...", func() error {
+				var pushErr error
+				resp, pushErr = client.PushSecrets(ctx, repo, envName, secrets)
+				return pushErr
+			})
 		}
-		return err
+		if err != nil {
+			analytics.Track(analytics.EventError, map[string]interface{}{
+				"command": "push",
+				"error":   err.Error(),
+			})
+			if apiErr, ok := err.(*api.APIError); ok {
+				deps.UI.Error(apiErr.Error())
+				if apiErr.UpgradeURL != "" {
+					analytics.Track(analytics.EventUpgradePrompt, map[string]interface{}{
+						"reason":  "push_error",
+						"command": "push",
+					})
+					deps.UI.Message(fmt.Sprintf("Upgrade: %s", deps.UI.Link(apiErr.UpgradeURL)))
+				}
+			} else {
+				deps.UI.Error(err.Error())
+			}
+			return err
+		}
 	}
 
 	deps.UI.Success(resp.Message)
