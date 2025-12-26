@@ -1,111 +1,200 @@
 # Keyway CLI
 
-[![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=keywaysh/cli-go)](https://www.keyway.sh/vaults/keywaysh/cli-go)
+**Stop sharing `.env` files on Slack.** GitHub access = secret access.
 
-GitHub-native secrets management. Sync secrets with your team and infra.
+[![Release](https://img.shields.io/github/v/release/keywaysh/cli?label=release&color=34D399)](https://github.com/keywaysh/cli/releases/latest)
+[![CI](https://github.com/keywaysh/cli/actions/workflows/ci.yml/badge.svg)](https://github.com/keywaysh/cli/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/github/keywaysh/cli/graph/badge.svg?token=O3LRCDFKLS)](https://codecov.io/github/keywaysh/cli)
+[![Go Report Card](https://goreportcard.com/badge/github.com/keywaysh/cli)](https://goreportcard.com/report/github.com/keywaysh/cli)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=keywaysh/cli)](https://www.keyway.sh/vaults/keywaysh/cli)
 
-## Quick Start
+---
+
+## The Problem
+
+You're still doing this:
+- Pasting secrets in Slack DMs
+- Emailing `.env` files to new devs
+- Rotating every secret when someone leaves
+- Manually copying vars to Vercel/Railway/Netlify
+
+## The Solution
 
 ```bash
-npx @keywaysh/cli init
+keyway pull
 ```
 
-No install required. This will authenticate, create a vault, and sync your `.env`.
+That's it. If you have access to the repo, you have access to the secrets. No invites, no training, no friction.
 
-## Installation (optional)
+---
 
-For faster repeated use, install globally:
+## Install
 
-### npm
-
-```bash
-npm install -g @keywaysh/cli
-```
-
-### Homebrew (macOS/Linux)
+### Homebrew (macOS & Linux)
 
 ```bash
 brew install keywaysh/tap/keyway
 ```
 
-### Manual download
+### Install Script
 
-Download from [GitHub Releases](https://github.com/keywaysh/cli-go/releases)
+```bash
+curl -fsSL https://get.keyway.sh | sh
+```
+
+### npx (no install)
+
+```bash
+npx @keywaysh/cli init
+```
+
+### Direct download
+
+Grab the binary for your platform from [Releases](https://github.com/keywaysh/cli/releases/latest).
+
+---
+
+## Quick Start
+
+```bash
+keyway init
+```
+
+This will:
+1. Authenticate with GitHub
+2. Create an encrypted vault for your repo
+3. Push your local `.env` to the vault
+
+New teammate joins? They run `keyway pull`. Done in 30 seconds.
+
+---
+
+## How It Works
+
+```bash
+keyway init          # First time: create vault, push secrets
+keyway push          # Update remote secrets
+keyway pull          # Get latest secrets
+keyway sync vercel   # Deploy to Vercel, Railway, Netlify
+```
+
+### Zero-Trust Mode
+
+Never write secrets to disk. Inject them directly into your process:
+
+```bash
+keyway run -- npm start
+keyway run --env production -- ./my-app
+```
+
+Secrets exist only in memory. When the process exits, they're gone.
+
+---
+
+## Security
+
+Your secrets are protected by:
+
+| Layer | Protection |
+|-------|------------|
+| **Encryption** | AES-256-GCM with random IV per secret |
+| **At Rest** | Encrypted in database, keys in isolated service |
+| **In Transit** | TLS 1.3 everywhere |
+| **Access Control** | GitHub collaborator API — no separate user management |
+| **Audit Trail** | Every pull and view is logged with IP and location |
+
+We can't read your secrets. Even if our database leaks, attackers get encrypted blobs.
+
+[Read our security whitepaper →](https://www.keyway.sh/security)
+
+---
 
 ## Commands
 
-```
-keyway login      # Authenticate with GitHub
-keyway logout     # Clear credentials
-keyway init       # Initialize vault for repository
-keyway push       # Upload secrets to vault
-keyway pull       # Download secrets from vault
-keyway run        # Run command with secrets injected
-keyway diff       # Compare local and remote secrets
-keyway sync       # Sync with external providers
-keyway scan       # Scan for leaked secrets
-keyway doctor     # Run environment checks
-```
+| Command | Description |
+|---------|-------------|
+| `keyway init` | Create vault and push initial secrets |
+| `keyway push` | Push local secrets to vault |
+| `keyway pull` | Pull secrets from vault |
+| `keyway run` | Run command with secrets injected (zero-trust) |
+| `keyway diff` | Compare local vs remote secrets |
+| `keyway sync` | Sync to Vercel, Railway, Netlify |
+| `keyway scan` | Scan repo for leaked secrets |
+| `keyway doctor` | Diagnose environment issues |
 
-## Runtime Injection (Zero-Trust)
-
-Instead of writing secrets to a `.env` file on disk, you can inject them directly into your application process. This is more secure as secrets never touch the disk.
-
-```bash
-# Run with default environment (development)
-keyway run -- npm run dev
-
-# Run with specific environment
-keyway run --env production -- python3 script.py
-
-# Run a compiled binary
-keyway run -- ./my-app
-```
+---
 
 ## Environment Variables
 
-- `KEYWAY_API_URL` - Override API URL (default: https://api.keyway.sh)
-- `KEYWAY_TOKEN` - Authentication token (for CI)
-- `KEYWAY_DISABLE_TELEMETRY=1` - Disable anonymous analytics
+| Variable | Description |
+|----------|-------------|
+| `KEYWAY_TOKEN` | Auth token for CI/CD (use `keyway login --ci`) |
+| `KEYWAY_API_URL` | Custom API endpoint |
+| `KEYWAY_DISABLE_TELEMETRY=1` | Disable anonymous analytics |
+
+---
+
+## Why Keyway?
+
+- **30 seconds** to onboard a new developer
+- **0 secrets** to rotate when someone leaves (just revoke GitHub access)
+- **1 command** to deploy secrets to production
+- **GitHub-native** — no new accounts, no new permissions to manage
+
+---
+
+## CI/CD
+
+Use an API key for automation:
+
+```bash
+# Generate an API key (Dashboard > Settings > API Keys)
+# Use scope "read:secrets" for CI — least privilege principle
+```
+
+```yaml
+# GitHub Actions example
+env:
+  KEYWAY_TOKEN: ${{ secrets.KEYWAY_TOKEN }}
+run: keyway pull --env production
+```
+
+Or use the [GitHub Action](https://github.com/keywaysh/keyway-action):
+
+```yaml
+- uses: keywaysh/keyway-action@v1
+  with:
+    token: ${{ secrets.KEYWAY_TOKEN }}
+    environment: production
+```
+
+---
 
 ## Development
 
-### Prerequisites
-
-- Go 1.22+
-
-### Build
-
 ```bash
-# Build for current platform
-make build
+# Prerequisites: Go 1.22+
 
-# Build for all platforms
-make build-all
-
-# Run directly
-make run ARGS="--version"
-make run ARGS="pull --env production"
+make build          # Build → ./keyway-dev
+make test           # Run tests
+make lint           # Run golangci-lint
+make install        # Install to ~/bin/keyway-dev
 ```
 
-### Test
+Releases are automated via GoReleaser on tag push.
 
-```bash
-make test
-make test-coverage
-```
+---
 
-### Install locally
+## Links
 
-```bash
-make install
-```
+- [Documentation](https://docs.keyway.sh)
+- [Dashboard](https://www.keyway.sh/dashboard)
+- [Security](https://www.keyway.sh/security)
+- [Status](https://status.keyway.sh)
 
-### Release
+---
 
-Releases are automated via GoReleaser when a tag is pushed:
+## License
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+MIT — see [LICENSE](LICENSE)

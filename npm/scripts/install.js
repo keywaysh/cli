@@ -8,7 +8,7 @@ const os = require("os");
 const crypto = require("crypto");
 
 const VERSION = require("../package.json").version;
-const REPO = "keywaysh/cli-go";
+const REPO = "keywaysh/cli";
 const BINARY_NAME = "keyway";
 
 const PLATFORMS = {

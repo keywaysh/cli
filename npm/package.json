@@ -10,11 +10,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/keywaysh/cli-go.git"
+    "url": "git+https://github.com/keywaysh/cli.git"
   },
   "homepage": "https://keyway.sh",
   "bugs": {
-    "url": "https://github.com/keywaysh/cli-go/issues"
+    "url": "https://github.com/keywaysh/cli/issues"
   },
   "keywords": [
     "secrets",

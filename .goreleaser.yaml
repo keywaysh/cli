@@ -79,7 +79,7 @@ changelog:
 release:
   github:
     owner: keywaysh
-    name: cli-go
+    name: cli
   draft: false
   prerelease: auto
   name_template: "v{{.Version}}"

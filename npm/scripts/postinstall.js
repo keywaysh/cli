@@ -131,7 +131,7 @@ async function main() {
       console.log("Development version detected, skipping binary download");
       // Create a placeholder script
       const placeholder = `#!/bin/sh
-echo "Keyway CLI not installed. Run 'make build' in the cli-go directory."
+echo "Keyway CLI not installed. Run 'make build' in the cli directory."
 exit 1
 `;
       fs.writeFileSync(path.join(BIN_DIR, "keyway"), placeholder);
