@@ -249,10 +249,6 @@ func buildDeepLinkInstallURL(baseURL string, repoIds *api.RepoIds) string {
 		strings.TrimSuffix(baseURL, "/"), repoIds.OwnerID, repoIds.RepoID)
 }
 
-func ensureLoginAndGitHubApp(repo string) (string, error) {
-	return ensureLoginAndGitHubAppWithDeps(repo, defaultDeps)
-}
-
 func ensureLoginAndGitHubAppWithDeps(repo string, deps *Dependencies) (string, error) {
 	// First ensure login
 	token, err := deps.Auth.EnsureLogin()

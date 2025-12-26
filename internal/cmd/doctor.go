@@ -144,10 +144,6 @@ func runDoctorWithDeps(opts DoctorOptions, deps *Dependencies) error {
 	return nil
 }
 
-func checkAuth() checkResult {
-	return checkAuthWithDeps(defaultDeps)
-}
-
 func checkAuthWithDeps(deps *Dependencies) checkResult {
 	storedAuth, err := deps.AuthStore.GetAuth()
 
@@ -191,10 +187,6 @@ func checkAuthWithDeps(deps *Dependencies) checkResult {
 	}
 }
 
-func checkGitHub() checkResult {
-	return checkGitHubWithDeps(defaultDeps)
-}
-
 func checkGitHubWithDeps(deps *Dependencies) checkResult {
 	if !deps.Git.IsGitRepository() {
 		return checkResult{
@@ -221,10 +213,6 @@ func checkGitHubWithDeps(deps *Dependencies) checkResult {
 		Status: "pass",
 		Detail: repo,
 	}
-}
-
-func checkNetwork() checkResult {
-	return checkNetworkWithDeps(defaultDeps)
 }
 
 func checkNetworkWithDeps(deps *Dependencies) checkResult {
@@ -258,10 +246,6 @@ func checkNetworkWithDeps(deps *Dependencies) checkResult {
 	}
 }
 
-func checkEnvFile() checkResult {
-	return checkEnvFileWithDeps(defaultDeps)
-}
-
 func checkEnvFileWithDeps(deps *Dependencies) checkResult {
 	envFiles := []string{".env", ".env.local", ".env.development", ".env.production"}
 	found := []string{}
@@ -287,10 +271,6 @@ func checkEnvFileWithDeps(deps *Dependencies) checkResult {
 		Status: "pass",
 		Detail: fmt.Sprintf("Found: %s", found[0]),
 	}
-}
-
-func checkGitignore() checkResult {
-	return checkGitignoreWithDeps(defaultDeps)
 }
 
 func checkGitignoreWithDeps(deps *Dependencies) checkResult {
