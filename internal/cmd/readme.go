@@ -7,27 +7,27 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/keywaysh/cli/internal/analytics"
 	"github.com/keywaysh/cli/internal/git"
 	"github.com/keywaysh/cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
 var readmeCmd = &cobra.Command{
-	Use:   "readme",
-	Short: "README badge management",
-	Long:  `Manage Keyway badge in your README file.`,
-}
-
-var addBadgeCmd = &cobra.Command{
-	Use:   "add-badge",
-	Short: "Add Keyway badge to README",
-	Long:  `Add the Keyway secrets badge to your README.md file.`,
-	RunE:  runAddBadge,
-}
-
-func init() {
-	readmeCmd.AddCommand(addBadgeCmd)
+	Use:    "readme",
+	Short:  "Add Keyway badge to README",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		ui.Intro("readme")
+		added, err := AddBadgeToReadme(false)
+		if err != nil {
+			ui.Error(err.Error())
+			return err
+		}
+		if added {
+			ui.Outro("Badge added! Commit and push to see it on GitHub.")
+		}
+		return nil
+	},
 }
 
 // GenerateBadge creates the markdown badge for a repository
@@ -184,26 +184,32 @@ func AddBadgeToReadme(silent bool) (bool, error) {
 	readmePath := FindReadmePath(cwd)
 	if readmePath == "" {
 		// No README found
-		if !silent && ui.IsInteractive() {
-			create, _ := ui.Confirm("No README found. Create README.md?", false)
-			if create {
-				// Get repo name for title
-				parts := strings.Split(repo, "/")
-				repoName := parts[len(parts)-1]
+		createReadme := false
 
-				readmePath = filepath.Join(cwd, "README.md")
-				initialContent := fmt.Sprintf("# %s\n\n", repoName)
-				if err := os.WriteFile(readmePath, []byte(initialContent), 0644); err != nil {
-					return false, fmt.Errorf("failed to create README: %w", err)
-				}
-			} else {
-				if !silent {
-					ui.Warn("Skipping badge insertion (no README)")
-				}
+		if silent {
+			// In silent mode (called from init), auto-create README
+			createReadme = true
+		} else if ui.IsInteractive() {
+			createReadme, _ = ui.Confirm("No README found. Create README.md?", false)
+			if !createReadme {
+				ui.Warn("Skipping badge insertion (no README)")
 				return false, nil
 			}
 		} else {
+			// Non-interactive and not silent: skip
 			return false, nil
+		}
+
+		if createReadme {
+			// Get repo name for title
+			parts := strings.Split(repo, "/")
+			repoName := parts[len(parts)-1]
+
+			readmePath = filepath.Join(cwd, "README.md")
+			initialContent := fmt.Sprintf("# %s\n\n", repoName)
+			if err := os.WriteFile(readmePath, []byte(initialContent), 0644); err != nil {
+				return false, fmt.Errorf("failed to create README: %w", err)
+			}
 		}
 	}
 
@@ -237,28 +243,3 @@ func AddBadgeToReadme(silent bool) (bool, error) {
 	return true, nil
 }
 
-func runAddBadge(cmd *cobra.Command, args []string) error {
-	ui.Intro("readme add-badge")
-
-	repo, _ := git.DetectRepo()
-
-	added, err := AddBadgeToReadme(false)
-	if err != nil {
-		ui.Error(err.Error())
-		return err
-	}
-
-	// Track badge event
-	analytics.Track(analytics.EventReadmeBadge, map[string]interface{}{
-		"repo":        repo,
-		"badge_added": added,
-		"source":      "add-badge",
-	})
-
-	if added {
-		ui.Outro("Badge added! Commit and push to see it on GitHub.")
-	} else {
-		ui.Outro("")
-	}
-	return nil
-}

@@ -177,7 +177,6 @@ func printCustomHelp(cmd *cobra.Command) {
 	fmt.Printf("    %s           %s\n", cyan("keyway diff"), "Compare secrets between environments")
 	fmt.Printf("    %s           %s\n", cyan("keyway scan"), "Scan codebase for leaked secrets")
 	fmt.Printf("    %s         %s\n", cyan("keyway doctor"), "Check your setup")
-	fmt.Printf("    %s         %s\n", cyan("keyway readme"), "Add badge to README")
 	fmt.Printf("    %s         %s\n", cyan("keyway logout"), "Clear stored credentials")
 	fmt.Println()
 
