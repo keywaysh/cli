@@ -30,9 +30,11 @@ type DevicePollResponse struct {
 
 // ValidateTokenResponse is the response from validating a token
 type ValidateTokenResponse struct {
-	Login    string      `json:"login"`
-	Username string      `json:"username"`
-	GitHubID interface{} `json:"githubId,omitempty"` // Can be string or number
+	Login     string      `json:"login"`
+	Username  string      `json:"username"`
+	GitHubID  interface{} `json:"githubId,omitempty"` // Can be string or number
+	Plan      string      `json:"plan,omitempty"`
+	CreatedAt string      `json:"createdAt,omitempty"`
 }
 
 // GitHubAppInstallationStatus is the status of GitHub App installation

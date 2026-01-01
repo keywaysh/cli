@@ -240,10 +240,12 @@ func runTokenLogin() error {
 		"repo":   repo,
 	})
 
-	// Identify user
+	// Identify user with plan info
 	analytics.Identify(validation.Username, map[string]interface{}{
 		"github_username": validation.Username,
 		"login_method":    "pat",
+		"plan":            validation.Plan,
+		"created_at":      validation.CreatedAt,
 	})
 
 	ui.Success(fmt.Sprintf("Logged in as %s", ui.Value("@"+validation.Username)))
