@@ -96,14 +96,14 @@ func TestDiscover(t *testing.T) {
 	}
 }
 
-func TestDiscover_ExcludesEnvLocal(t *testing.T) {
+func TestDiscover_IncludesEnvLocal(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "env-test-*")
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Create .env.local (should be excluded)
+	// Create .env.local (should be included)
 	os.WriteFile(filepath.Join(tmpDir, ".env.local"), []byte("TEST=value"), 0644)
 	os.WriteFile(filepath.Join(tmpDir, ".env"), []byte("TEST=value"), 0644)
 
@@ -113,10 +113,21 @@ func TestDiscover_ExcludesEnvLocal(t *testing.T) {
 
 	candidates := Discover()
 
+	if len(candidates) != 2 {
+		t.Errorf("expected 2 candidates (.env and .env.local), got %d: %v", len(candidates), candidates)
+	}
+
+	foundEnvLocal := false
 	for _, c := range candidates {
 		if c.File == ".env.local" {
-			t.Error(".env.local should be excluded from discovery")
+			foundEnvLocal = true
+			if c.Env != "local" {
+				t.Errorf(".env.local should map to 'local', got %q", c.Env)
+			}
 		}
+	}
+	if !foundEnvLocal {
+		t.Error(".env.local should be included in discovery")
 	}
 }
 

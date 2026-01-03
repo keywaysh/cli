@@ -22,7 +22,6 @@ func Discover() []Candidate {
 
 	// Template files to exclude (not real secrets)
 	excludeFiles := map[string]bool{
-		".env.local":    true, // Local overrides
 		".env.example":  true, // Template files
 		".env.sample":   true,
 		".env.template": true,
