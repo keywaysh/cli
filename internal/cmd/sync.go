@@ -552,6 +552,33 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Check sync status early (reused for first-link detection and first-sync detection)
+	syncStatus, _ := client.GetSyncStatus(ctx, repo, selectedProject.ConnectionID, selectedProject.ID, keywayEnv)
+
+	// For first-time links, ask user if they want to save the connection
+	if syncStatus != nil && syncStatus.IsFirstSync && ui.IsInteractive() {
+		teamInfo := ""
+		if selectedProject.TeamName != nil {
+			teamInfo = fmt.Sprintf(" (%s)", *selectedProject.TeamName)
+		}
+		ui.Step(fmt.Sprintf("Link %s ↔ %s%s", repo, getProjectDisplayName(selectedProject), teamInfo))
+
+		shouldLink, _ := ui.Confirm("Save this project link for future syncs?", true)
+		if shouldLink {
+			_, linkErr := client.LinkProject(ctx, repo, api.SyncOptions{
+				ConnectionID:        selectedProject.ConnectionID,
+				ProjectID:           selectedProject.ID,
+				KeywayEnvironment:   keywayEnv,
+				ProviderEnvironment: providerEnv,
+			})
+			if linkErr != nil {
+				ui.Warn("Could not save project link (sync will still work)")
+			} else {
+				ui.Success("Project linked!")
+			}
+		}
+	}
+
 	needsDirectionPrompt := direction == ""
 
 	// Get diff and prompt for direction
@@ -610,11 +637,10 @@ func runSync(cmd *cobra.Command, args []string) error {
 		direction = "push"
 	}
 
-	// Check first sync status
-	status, err := client.GetSyncStatus(ctx, repo, selectedProject.ConnectionID, selectedProject.ID, keywayEnv)
-	if err == nil && status.IsFirstSync && direction == "push" && status.VaultIsEmpty && status.ProviderHasSecrets {
+	// Check first sync status (use cached syncStatus from earlier)
+	if syncStatus != nil && syncStatus.IsFirstSync && direction == "push" && syncStatus.VaultIsEmpty && syncStatus.ProviderHasSecrets {
 		ui.Warn(fmt.Sprintf("Your Keyway vault is empty for \"%s\", but %s has %d secrets.",
-			keywayEnv, providerDisplayName, status.ProviderSecretCount))
+			keywayEnv, providerDisplayName, syncStatus.ProviderSecretCount))
 		ui.Message(ui.Dim("(Use --env to sync a different environment)"))
 
 		if ui.IsInteractive() {

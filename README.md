@@ -117,10 +117,16 @@ We can't read your secrets. Even if our database leaks, attackers get encrypted 
 | `keyway init` | Create vault and push initial secrets |
 | `keyway push` | Push local secrets to vault |
 | `keyway pull` | Pull secrets from vault |
+| `keyway set KEY=VALUE` | Set a single secret in the vault |
 | `keyway run` | Run command with secrets injected (zero-trust) |
 | `keyway diff` | Compare local vs remote secrets |
 | `keyway sync` | Sync to Vercel, Railway, Netlify |
+| `keyway connect` | Connect to a provider (Vercel, Railway) |
+| `keyway connections` | List connected providers |
+| `keyway disconnect` | Remove a provider connection |
 | `keyway scan` | Scan repo for leaked secrets |
+| `keyway login` | Authenticate with GitHub |
+| `keyway logout` | Clear stored credentials |
 | `keyway doctor` | Diagnose environment issues |
 
 ---
@@ -176,10 +182,10 @@ Or use the [GitHub Action](https://github.com/keywaysh/keyway-action):
 ```bash
 # Prerequisites: Go 1.22+
 
-make build          # Build → ./keyway-dev
+make build          # Build → ./bin/keyway
 make test           # Run tests
 make lint           # Run golangci-lint
-make install        # Install to ~/bin/keyway-dev
+make install        # Install to /usr/local/bin/keyway
 ```
 
 Releases are automated via GoReleaser on tag push.
@@ -189,8 +195,8 @@ Releases are automated via GoReleaser on tag push.
 ## Links
 
 - [Documentation](https://docs.keyway.sh)
-- [Dashboard](https://app.keyway.sh)
-- [Security](https://www.keyway.sh/security)
+- [Dashboard](https://keyway.sh)
+- [Security](https://keyway.sh/security)
 - [Status](https://status.keyway.sh)
 
 ---

@@ -16,6 +16,7 @@ make test-coverage      # Run tests with full coverage report
 make test-coverage-logic # Coverage for business logic only (excludes wrappers)
 make lint               # Run golangci-lint
 make install            # Install to /usr/local/bin
+make prepare-npm        # Copy README to npm/ for publishing
 ```
 
 ## Architecture
@@ -27,18 +28,20 @@ internal/
 │   ├── root.go         # Root command, registers all subcommands
 │   ├── deps.go         # Interface definitions for DI
 │   ├── deps_real.go    # Real implementations (thin wrappers)
+│   ├── fs.go           # File system helpers
 │   ├── mocks_test.go   # Mock implementations for testing
 │   ├── auth_error.go   # Auth error handling (401 retry)
 │   ├── init.go         # keyway init
-│   ├── login.go        # keyway login
+│   ├── login.go        # keyway login + logout
 │   ├── pull.go         # keyway pull
 │   ├── push.go         # keyway push
+│   ├── set.go          # keyway set (set single secret)
 │   ├── run.go          # keyway run (inject secrets into command)
 │   ├── diff.go         # keyway diff (compare local vs vault)
 │   ├── doctor.go       # keyway doctor (diagnostics)
 │   ├── scan.go         # keyway scan (find leaked secrets)
 │   ├── sync.go         # keyway sync (sync with external providers)
-│   ├── connect.go      # keyway connect (link external providers)
+│   ├── connect.go      # keyway connect/disconnect/connections
 │   └── readme.go       # keyway readme (add badge)
 ├── api/            # Keyway API client
 ├── auth/           # Token storage (keyring)

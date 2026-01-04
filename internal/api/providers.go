@@ -80,6 +80,17 @@ type SyncStatus struct {
 	ProviderSecretCount int  `json:"providerSecretCount"`
 }
 
+// ProjectLink represents a link between a vault and a provider project
+type ProjectLink struct {
+	ID                  string  `json:"id"`
+	ProjectID           string  `json:"projectId"`
+	ProjectName         *string `json:"projectName"`
+	KeywayEnvironment   string  `json:"keywayEnvironment"`
+	ProviderEnvironment string  `json:"providerEnvironment"`
+	LastSyncedAt        *string `json:"lastSyncedAt"`
+	IsNew               bool    `json:"isNew"`
+}
+
 // SyncOptions contains options for sync operations
 type SyncOptions struct {
 	ConnectionID        string  `json:"connectionId"`
@@ -165,6 +176,29 @@ func (c *Client) GetAllProviderProjects(ctx context.Context, provider string) ([
 	}
 
 	return wrapper.Data.Projects, wrapper.Data.Connections, nil
+}
+
+// LinkProject links a vault to a provider project without syncing
+func (c *Client) LinkProject(ctx context.Context, repo string, opts SyncOptions) (*ProjectLink, error) {
+	var wrapper struct {
+		Data struct {
+			Link ProjectLink `json:"link"`
+		} `json:"data"`
+	}
+
+	body := map[string]interface{}{
+		"connectionId":        opts.ConnectionID,
+		"projectId":           opts.ProjectID,
+		"keywayEnvironment":   opts.KeywayEnvironment,
+		"providerEnvironment": opts.ProviderEnvironment,
+	}
+
+	err := c.do(ctx, http.MethodPost, fmt.Sprintf("/v1/integrations/vaults/%s/sync/link", repo), body, &wrapper)
+	if err != nil {
+		return nil, err
+	}
+
+	return &wrapper.Data.Link, nil
 }
 
 // GetSyncStatus returns the sync status for a vault/project pair

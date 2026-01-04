@@ -1,4 +1,4 @@
-.PHONY: build build-all run test test-coverage clean install lint dev
+.PHONY: build build-all run test test-coverage clean install lint dev prepare-npm
 
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
@@ -85,18 +85,24 @@ tidy:
 deps:
 	go mod download
 
+# Prepare npm package (copy README)
+prepare-npm:
+	cp README.md npm/README.md
+	@echo "Copied README.md to npm/"
+
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build       - Build for current platform"
-	@echo "  build-all   - Build for all platforms"
-	@echo "  run         - Run with ARGS (e.g., make run ARGS='--version')"
-	@echo "  dev         - Same as run"
-	@echo "  test        - Run tests"
+	@echo "  build        - Build for current platform"
+	@echo "  build-all    - Build for all platforms"
+	@echo "  run          - Run with ARGS (e.g., make run ARGS='--version')"
+	@echo "  dev          - Same as run"
+	@echo "  test         - Run tests"
 	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  clean       - Remove build artifacts"
-	@echo "  install     - Install to /usr/local/bin"
-	@echo "  lint        - Run linter"
-	@echo "  fmt         - Format code"
-	@echo "  tidy        - Tidy go.mod"
-	@echo "  deps        - Download dependencies"
+	@echo "  clean        - Remove build artifacts"
+	@echo "  install      - Install to /usr/local/bin"
+	@echo "  lint         - Run linter"
+	@echo "  fmt          - Format code"
+	@echo "  tidy         - Tidy go.mod"
+	@echo "  deps         - Download dependencies"
+	@echo "  prepare-npm  - Copy README to npm/"
