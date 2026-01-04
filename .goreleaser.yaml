@@ -86,6 +86,7 @@ release:
 
 brews:
   - name: keyway
+    skip_upload: "{{ if .Prerelease }}true{{ end }}"
     homepage: https://keyway.sh
     description: "GitHub-native secrets management CLI"
     license: "MIT"

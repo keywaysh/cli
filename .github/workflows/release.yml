@@ -95,4 +95,14 @@ jobs:
 
       - name: Publish to npm
         working-directory: npm
-        run: npm publish --access public --provenance
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          # Check if prerelease (contains - like 0.6.0-beta.1)
+          if [[ "$VERSION" == *-* ]]; then
+            echo "Publishing prerelease version $VERSION with tag 'beta'"
+            npm publish --access public --provenance --tag beta
+          else
+            echo "Publishing stable version $VERSION"
+            npm publish --access public --provenance
+          fi
