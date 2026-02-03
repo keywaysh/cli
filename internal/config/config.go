@@ -6,17 +6,9 @@ import (
 )
 
 const (
-	// DefaultAPIURL is the production API URL
-	DefaultAPIURL = "https://api.keyway.sh"
-
-	// DefaultDashboardURL is the production dashboard URL
-	DefaultDashboardURL = "https://app.keyway.sh"
-
-	// DefaultPostHogHost is the PostHog host
-	DefaultPostHogHost = "https://eu.i.posthog.com"
-)
-
-var (
+	DefaultAPIURL        = "https://api.keyway.sh"
+	DefaultDashboardURL  = "https://app.keyway.sh"
+	DefaultPostHogHost   = "https://eu.i.posthog.com"
 	DefaultGitHubAPIURL  = "https://api.github.com"
 	DefaultGitHubBaseURL = "https://github.com"
 	DefaultDocsURL       = "https://docs.keyway.sh"
