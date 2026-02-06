@@ -110,7 +110,9 @@ claude mcp add keyway -- npx @keywaysh/mcp
 code --add-mcp '{"name":"keyway","command":"npx","args":["@keywaysh/mcp"]}'
 ```
 
-Works with Claude Code, VS Code, Cursor, Windsurf, Warp, GitHub Copilot, and Goose.
+Works with Claude Code, VS Code, Cursor, Windsurf, Warp, GitHub Copilot*, and Goose.
+
+*GitHub Copilot supports MCP tools only (not resources or prompts).
 
 [MCP Server docs →](https://github.com/keywaysh/keyway-mcp) · [AI agents guide →](https://docs.keyway.sh/ai-agents)
 
