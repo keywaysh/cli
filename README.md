@@ -9,16 +9,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=keywaysh/cli)](https://www.keyway.sh/vaults/keywaysh/cli)
 
-<!-- TODO: replace with a 15s GIF of `keyway init` → `keyway pull` -->
+<!-- TODO: replace with a 15s GIF of `keyway init` → `keyway run` -->
 
 ```
   You                          Teammate
   ─────────────────            ─────────────────
-  $ keyway init                $ keyway pull
+  $ keyway init                $ keyway run -- npm start
   ✓ Logged in via GitHub       ✓ Logged in via GitHub
-  ✓ Vault created              ✓ Pulled 12 secrets
-  ✓ Pushed 12 secrets          ✓ Wrote .env
-  Ready.                       Ready.
+  ✓ Vault created              ✓ Injected 12 secrets
+  ✓ Pushed 12 secrets          ✓ Server running
+  Ready.                       Ready. No .env on disk.
 ```
 
 ---
@@ -49,13 +49,14 @@ npx @keywaysh/cli init
 Then, from your repo:
 
 ```bash
-keyway init     # Create vault, push secrets
+keyway init                  # Create vault, push secrets
+keyway run -- npm start      # Run with secrets injected, nothing on disk
 ```
 
 A teammate clones the repo and runs:
 
 ```bash
-keyway pull     # Get secrets — 30 seconds from install to synced
+keyway run -- npm start      # Secrets injected — 30 seconds from install to running
 ```
 
 ---
@@ -64,8 +65,9 @@ keyway pull     # Get secrets — 30 seconds from install to synced
 
 ```bash
 keyway init          # First time: create vault, push secrets
+keyway run           # Run with secrets injected (nothing on disk)
 keyway push          # Update remote secrets
-keyway pull          # Get latest secrets
+keyway pull          # Download secrets as .env (when you need the file)
 keyway diff          # Compare local vs remote before pushing
 keyway sync vercel   # Deploy to Vercel, Railway, Netlify
 ```
