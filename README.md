@@ -1,6 +1,6 @@
 # Keyway CLI
 
-**Stop sharing `.env` files on Slack.** GitHub access = secret access.
+**GitHub-native secrets management.** Repo access = secret access.
 
 [![Release](https://img.shields.io/github/v/release/keywaysh/cli?label=release&color=34D399)](https://github.com/keywaysh/cli/releases/latest)
 [![CI](https://github.com/keywaysh/cli/actions/workflows/ci.yml/badge.svg)](https://github.com/keywaysh/cli/actions/workflows/ci.yml)
@@ -9,64 +9,54 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Keyway Secrets](https://www.keyway.sh/badge.svg?repo=keywaysh/cli)](https://www.keyway.sh/vaults/keywaysh/cli)
 
----
+<!-- TODO: replace with a 15s GIF of `keyway init` → `keyway pull` -->
 
-## The Problem
-
-You're still doing this:
-- Pasting secrets in Slack DMs
-- Emailing `.env` files to new devs
-- Rotating every secret when someone leaves
-- Manually copying vars to Vercel/Railway/Netlify
-
-## The Solution
-
-```bash
-keyway pull
 ```
-
-That's it. If you have access to the repo, you have access to the secrets. No invites, no training, no friction.
-
----
-
-## Install
-
-### Homebrew (macOS & Linux)
-
-```bash
-brew install keywaysh/tap/keyway
+  You                          Teammate
+  ─────────────────            ─────────────────
+  $ keyway init                $ keyway pull
+  ✓ Logged in via GitHub       ✓ Logged in via GitHub
+  ✓ Vault created              ✓ Pulled 12 secrets
+  ✓ Pushed 12 secrets          ✓ Wrote .env
+  Ready.                       Ready.
 ```
-
-### Install Script
-
-```bash
-curl -fsSL https://keyway.sh/install.sh | sh
-```
-
-### npx (no install)
-
-```bash
-npx @keywaysh/cli init
-```
-
-### Direct download
-
-Grab the binary for your platform from [Releases](https://github.com/keywaysh/cli/releases/latest).
 
 ---
 
 ## Quick Start
 
 ```bash
-keyway init
+brew install keywaysh/tap/keyway
 ```
 
-This will:
-1. Authenticate with GitHub
-2. Create an encrypted vault for your repo
-3. Push your local `.env` to the vault
+<details>
+<summary>Other install methods</summary>
 
-New teammate joins? They run `keyway pull`. Done in 30 seconds.
+```bash
+# Install script (macOS & Linux)
+curl -fsSL https://keyway.sh/install.sh | sh
+
+# npx (no install)
+npx @keywaysh/cli init
+
+# Direct download
+# Grab the binary for your platform from Releases:
+# https://github.com/keywaysh/cli/releases/latest
+```
+
+</details>
+
+Then, from your repo:
+
+```bash
+keyway init     # Create vault, push secrets
+```
+
+A teammate clones the repo and runs:
+
+```bash
+keyway pull     # Get secrets — 30 seconds from install to synced
+```
 
 ---
 
@@ -76,6 +66,7 @@ New teammate joins? They run `keyway pull`. Done in 30 seconds.
 keyway init          # First time: create vault, push secrets
 keyway push          # Update remote secrets
 keyway pull          # Get latest secrets
+keyway diff          # Compare local vs remote before pushing
 keyway sync vercel   # Deploy to Vercel, Railway, Netlify
 ```
 
@@ -92,6 +83,37 @@ Secrets exist only in memory. When the process exits, they're gone.
 
 ---
 
+## Works with AI Assistants
+
+AI coding agents can read your `.env` files. Keyway keeps secrets out of AI context.
+
+### `keyway run` — secrets never touch disk
+
+The AI sees command output but never secret values:
+
+```bash
+keyway run -- npm test        # AI sees "tests passed", not your DB password
+keyway run -- npm run dev     # Secrets in RAM only, invisible to agents
+```
+
+### MCP Server — AI manages secrets without seeing them
+
+8 tools your AI assistant can use — generate, validate, scan, diff, inject, list, set, and list environments — with values always masked:
+
+```bash
+# Claude Code
+claude mcp add keyway -- npx @keywaysh/mcp
+
+# VS Code / Cursor
+code --add-mcp '{"name":"keyway","command":"npx","args":["@keywaysh/mcp"]}'
+```
+
+Works with Claude Code, VS Code, Cursor, Windsurf, Warp, GitHub Copilot, and Goose.
+
+[MCP Server docs →](https://github.com/keywaysh/keyway-mcp) · [AI agents guide →](https://docs.keyway.sh/ai-agents)
+
+---
+
 ## Security
 
 Your secrets are protected by:
@@ -99,12 +121,14 @@ Your secrets are protected by:
 | Layer | Protection |
 |-------|------------|
 | **Encryption** | AES-256-GCM with random IV per secret |
-| **At Rest** | Encrypted in database, keys in isolated service |
+| **At Rest** | Encrypted in database, keys in isolated Go crypto microservice |
 | **In Transit** | TLS 1.3 everywhere |
 | **Access Control** | GitHub collaborator API — no separate user management |
 | **Audit Trail** | Every pull and view is logged with IP and location |
 
 We can't read your secrets. Even if our database leaks, attackers get encrypted blobs.
+
+Self-hostable — run the entire stack on your own infrastructure with Docker Compose.
 
 [Read our security whitepaper →](https://www.keyway.sh/security)
 
@@ -128,25 +152,6 @@ We can't read your secrets. Even if our database leaks, attackers get encrypted 
 | `keyway login` | Authenticate with GitHub |
 | `keyway logout` | Clear stored credentials |
 | `keyway doctor` | Diagnose environment issues |
-
----
-
-## Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `KEYWAY_TOKEN` | Auth token for CI/CD (create in Dashboard > API Keys) |
-| `KEYWAY_API_URL` | Custom API endpoint |
-| `KEYWAY_DISABLE_TELEMETRY=1` | Disable anonymous analytics |
-
----
-
-## Why Keyway?
-
-- **30 seconds** to onboard a new developer
-- **0 secrets** to rotate when someone leaves (just revoke GitHub access)
-- **1 command** to deploy secrets to production
-- **GitHub-native** — no new accounts, no new permissions to manage
 
 ---
 
@@ -177,6 +182,27 @@ Or use the [GitHub Action](https://github.com/keywaysh/keyway-action):
 
 ---
 
+## Why Keyway?
+
+- **30 seconds** to onboard a new developer
+- **0 secrets** to rotate when someone leaves (just revoke GitHub access)
+- **1 command** to deploy secrets to production
+- **GitHub-native** — no new accounts, no new permissions to manage
+- **First-class AI support** — MCP server and zero-trust mode keep secrets out of AI context
+- **Fully open-source** — MIT licensed, self-hostable, auditable
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `KEYWAY_TOKEN` | Auth token for CI/CD (create in Dashboard > API Keys) |
+| `KEYWAY_API_URL` | Custom API endpoint |
+| `KEYWAY_DISABLE_TELEMETRY=1` | Disable anonymous analytics |
+
+---
+
 ## Development
 
 ```bash
@@ -197,6 +223,9 @@ Releases are automated via GoReleaser on tag push.
 - [Documentation](https://docs.keyway.sh)
 - [Dashboard](https://keyway.sh)
 - [Security](https://keyway.sh/security)
+- [MCP Server](https://github.com/keywaysh/keyway-mcp)
+- [GitHub Action](https://github.com/keywaysh/keyway-action)
+<!-- TODO: add self-hosting guide link when docs page is live -->
 - [Status](https://status.keyway.sh)
 
 ---
