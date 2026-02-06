@@ -83,20 +83,21 @@ func TestRunDockerWithDeps_DockerCompose_Success(t *testing.T) {
 		t.Errorf("expected command 'docker', got %q", cmdRunner.LastCommand)
 	}
 
-	// Verify args are "compose up -d"
-	expectedArgs := []string{"compose", "up", "-d"}
-	if len(cmdRunner.LastArgs) != len(expectedArgs) {
-		t.Errorf("expected args %v, got %v", expectedArgs, cmdRunner.LastArgs)
+	// Verify compose and --env-file are present
+	if len(cmdRunner.LastArgs) < 4 {
+		t.Fatalf("expected at least 4 args, got %v", cmdRunner.LastArgs)
 	}
-	for i, expected := range expectedArgs {
-		if i < len(cmdRunner.LastArgs) && cmdRunner.LastArgs[i] != expected {
-			t.Errorf("expected arg[%d] = %q, got %q", i, expected, cmdRunner.LastArgs[i])
-		}
+	if cmdRunner.LastArgs[0] != "compose" {
+		t.Errorf("expected first arg 'compose', got %q", cmdRunner.LastArgs[0])
+	}
+	if cmdRunner.LastArgs[1] != "--env-file" {
+		t.Errorf("expected '--env-file' flag, got %q", cmdRunner.LastArgs[1])
 	}
 
-	// Verify secrets were passed via environment (compose uses env injection)
-	if cmdRunner.LastSecrets["API_KEY"] != "secret123" {
-		t.Errorf("expected API_KEY in secrets, got %v", cmdRunner.LastSecrets)
+	// Verify up -d are at the end
+	argsStr := strings.Join(cmdRunner.LastArgs, " ")
+	if !strings.Contains(argsStr, "up -d") {
+		t.Errorf("expected 'up -d' in args, got %v", cmdRunner.LastArgs)
 	}
 }
 

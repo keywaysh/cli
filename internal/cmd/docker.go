@@ -193,10 +193,15 @@ func runDockerCompose(opts DockerOptions, secrets map[string]string, deps *Depen
 	// For "run" subcommand, inject -e flags (similar to docker run)
 	// For other subcommands like "up", we need --env-file approach
 	if len(opts.DockerArgs) > 0 && opts.DockerArgs[0] == "run" {
+		// Extract user's -e flags to ensure they take precedence
+		userEnvVars := extractUserEnvVars(opts.DockerArgs)
+
 		// Find position after "run" to inject -e flags
 		newArgs := []string{"compose", "run"}
 		for k, v := range secrets {
-			newArgs = append(newArgs, "-e", fmt.Sprintf("%s=%s", k, v))
+			if _, userSet := userEnvVars[k]; !userSet {
+				newArgs = append(newArgs, "-e", fmt.Sprintf("%s=%s", k, v))
+			}
 		}
 		// Append remaining args after "run"
 		if len(opts.DockerArgs) > 1 {
