@@ -11,7 +11,7 @@
 
 <!-- TODO: replace with a 15s GIF of `keyway init` → `keyway run` -->
 
-```
+```text
   You                          Teammate
   ─────────────────            ─────────────────
   $ keyway init                $ keyway run -- npm start
@@ -100,7 +100,7 @@ keyway run -- npm run dev     # Secrets in RAM only, invisible to agents
 
 ### MCP Server — AI manages secrets without seeing them
 
-8 tools your AI assistant can use — generate, validate, scan, diff, inject, list, set, and list environments — with values always masked:
+5 tools your AI assistant can use — `keyway_list_secrets`, `keyway_get_secret`, `keyway_set_secret`, `keyway_inject_run`, and `keyway_list_environments` — with values always masked:
 
 ```bash
 # Claude Code
